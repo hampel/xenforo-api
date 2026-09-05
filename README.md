@@ -57,7 +57,7 @@ $info->hasScope('user:write');
 
 ## What is wrapped
 
-150 of the API's 162 endpoints, through these accessors:
+153 of the API's 162 endpoints, through these accessors:
 
 | | |
 |---|---|
@@ -73,8 +73,7 @@ $info->hasScope('user:write');
 | `resourceItems()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
 
 Not wrapped: the OAuth2 token endpoints — the credentials themselves are, see
-[Authenticating](#authenticating) — oEmbed, stats, featured content, search forums,
-conversation labels, and `threads/{id}/change-type`.
+[Authenticating](#authenticating) — oEmbed, stats, featured content, and search forums.
 All of them are one `connection()->get()` or `->post()` away, and a `Resource` subclass is
 how to make that permanent — see [Extending it](#extending-it-for-add-on-endpoints).
 

@@ -15,7 +15,8 @@ Initial development. Nothing is released, so nothing here is a change from anyth
 * 33 entity classes generated from XenForo's OpenAPI specification by
   `tools/generate-schemas.php`, pinned to `resources/openapi.json` taken from
   https://github.com/xenforo-ltd/docs `static/api/openapi.json` on 2026-09-05
-* `SpecConformanceTest` checks every endpoint the resources call against that specification
+* `SpecConformanceTest` checks every endpoint the resources call against that specification -
+  153 of the API's 162 endpoints are wrapped
 * file uploads: `Upload`, `Multipart` and `Connection::postMultipart()`, covering the five
   core endpoints that take a file - `attachments/`, `attachments/new-key`, `me/avatar`,
   `users/{id}/avatar` and `threads/{id}/feature` - plus `threads/{id}/unfeature`

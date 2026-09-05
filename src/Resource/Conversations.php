@@ -95,6 +95,45 @@ final class Conversations extends Resource
     }
 
     /**
+     * Update a conversation's own settings. Only the conversation's starter may.
+     *
+     * `conversation_open` false closes it to further replies, and `open_invite` true lets
+     * any participant add others - both are the conversation's settings rather than this
+     * user's view of it, which is what star() and markRead() below are.
+     *
+     * @param  array<string, mixed>  $payload  title, open_invite, conversation_open
+     */
+    public function update(int $conversationId, array $payload): Conversation
+    {
+        return Conversation::fromArray(
+            $this->apiPost('conversations/' . $conversationId . '/', $payload)->array('conversation')
+        );
+    }
+
+    /**
+     * Replace the labels this user has on a conversation.
+     *
+     * The whole set at once rather than an addition. Labels are per-participant, like the
+     * star, so this changes nothing for anybody else in the conversation.
+     *
+     * An empty array sends an empty body, http_build_query having nothing to write - which
+     * should clear them, XenForo's `array-str` filter reading an absent key as an empty
+     * list. Should, because the endpoint postdates 2.3 and there is no source here to check
+     * it against; if you have a 2.4 forum, that is the one thing here worth confirming.
+     *
+     * NEWER THAN 2.3. Conversation labels are in XenForo's published specification but not
+     * in 2.3 - a 2.3.12 install has no such route and no label record behind it - so a 404
+     * here means the forum predates them rather than that the conversation is missing.
+     *
+     * @param  list<string>  $labels
+     */
+    public function setLabels(int $conversationId, array $labels): bool
+    {
+        return $this->apiPost('conversations/' . $conversationId . '/labels', ['labels' => $labels])
+            ->isSuccess();
+    }
+
+    /**
      * @param  list<int>  $recipientIds
      */
     public function invite(int $conversationId, array $recipientIds): bool

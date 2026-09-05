@@ -164,6 +164,30 @@ final class Threads extends Resource
     }
 
     /**
+     * Convert a thread to another type - a discussion into a question, say.
+     *
+     * The type ids are XenForo's own: `discussion`, `question`, `article`, `poll`,
+     * `suggestion`, and whatever an add-on has registered. The new type's own fields go in
+     * `$typeData` and are named by that type rather than by anything general.
+     *
+     * Not every thread can be converted, and the reason is the type's rather than the
+     * user's: XenForo refuses when the CURRENT type says it cannot be changed, which a
+     * permission check will not tell you in advance. Converting to the type it already is
+     * is an error too.
+     *
+     * @param  array<string, mixed>  $typeData  input the new type understands
+     */
+    public function changeType(int $threadId, string $newThreadTypeId, array $typeData = []): Thread
+    {
+        return Thread::fromArray(
+            $this->apiPost(
+                'threads/' . $threadId . '/change-type',
+                ['new_thread_type_id' => $newThreadTypeId] + $typeData
+            )->array('thread')
+        );
+    }
+
+    /**
      * Vote on a thread poll-style rating. `$type` is 'up', 'down' or 'none'.
      */
     public function vote(int $threadId, string $type): bool

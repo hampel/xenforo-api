@@ -112,6 +112,25 @@ final class ThreadsTest extends TestCase
         );
     }
 
+    /**
+     * The new type's own fields sit alongside new_thread_type_id rather than nested under
+     * it - XenForo reads them with the same filter() call as everything else, because the
+     * type handler is what knows their names, not the endpoint.
+     */
+    public function test_changing_a_threads_type_carries_the_new_types_own_input(): void
+    {
+        $this->client->pushJson(200, ['success' => true, 'thread' => ['thread_id' => 12]]);
+
+        $thread = $this->xenforo()->threads()->changeType(12, 'question', ['solution_post_id' => 55]);
+
+        $this->assertSame(12, $thread->thread_id);
+        $this->assertSame('https://forum.example.com/api/threads/12/change-type', $this->sentUri());
+        $this->assertSame(
+            ['new_thread_type_id' => 'question', 'solution_post_id' => '55'],
+            $this->sentBody()
+        );
+    }
+
     public function test_it_pages_through_a_threads_posts(): void
     {
         $this->client->pushJson(200, [
