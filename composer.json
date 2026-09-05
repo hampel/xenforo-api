@@ -23,6 +23,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.3",
+        "ext-ctype": "*",
         "ext-json": "*",
         "psr/http-client": "^1.0",
         "psr/http-factory": "^1.0",
