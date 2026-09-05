@@ -21,12 +21,13 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Client.php` | the entry point; named accessors and `resource()` |
 | `src/Connection.php` | everything that touches HTTP |
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
-| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - every one of the API's 162 endpoints |
+| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - every endpoint in the pinned specification |
 | `src/Resource/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
-| `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo`, `Download` |
+| `src/Result/` | what an endpoint answers with, where that is not an entity |
+| `src/Exception/` | the hierarchy, from `XenForoException` down |
 | `src/Upload.php`, `src/Multipart.php` | files going out, and the `multipart/form-data` body that carries them |
-| `src/Support/Payload.php` | field naming, shared by both body encodings |
+| `src/Support/` | coercion, and the field naming shared by both body encodings |
 | `resources/openapi.json` | XenForo's own specification, pinned |
 | `tools/generate-schemas.php` | the generator |
 | `harness/` | rig exercises - real calls to a real forum |
