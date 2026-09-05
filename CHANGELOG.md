@@ -19,4 +19,7 @@ Initial development. Nothing is released, so nothing here is a change from anyth
   core endpoints that take a file - `attachments/`, `attachments/new-key`, `me/avatar`,
   `users/{id}/avatar` and `threads/{id}/feature` - plus `threads/{id}/unfeature`
 * `Support\Payload`, so a multipart body and a form-encoded one cannot name a field differently
+* file downloads: `Connection::sendRaw()`, `Result\Download` and the three attachment
+  endpoints that do not answer in JSON - `attachments/{id}/data`, `.../thumbnail` and
+  `.../retina-thumbnail`
 * harness exercises: `index`, `read`, `pagination`, `encoding` and `upload`

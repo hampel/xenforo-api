@@ -9,6 +9,7 @@ use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Result\ApiResponse;
 use Hampel\XenForo\Api\Result\Page;
 use Hampel\XenForo\Api\Upload;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -82,6 +83,20 @@ abstract class Resource
     protected function apiPut(string $path, array $payload = [], array $query = []): ApiResponse
     {
         return $this->connection->put($path, $payload, $query);
+    }
+
+    /**
+     * A GET whose answer is not JSON - a file, or a redirect to one.
+     *
+     * The response comes back whole and unread, so a large attachment never becomes a PHP
+     * string on the way past. Connection::sendRaw() has the detail, including why a
+     * redirect counts as a success here and not in apiGet().
+     *
+     * @param  array<string, scalar|array<mixed>|null>  $query
+     */
+    protected function apiGetRaw(string $path, array $query = []): ResponseInterface
+    {
+        return $this->connection->getRaw($path, $query);
     }
 
     /**

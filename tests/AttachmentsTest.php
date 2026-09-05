@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Tests;
 
+use Hampel\XenForo\Api\Exception\RuntimeException;
 use Hampel\XenForo\Api\Upload;
 
 final class AttachmentsTest extends TestCase
@@ -89,6 +90,116 @@ final class AttachmentsTest extends TestCase
         $this->assertTrue($this->xenforo()->attachments()->delete(7, 'abc123'));
         $this->assertSame('DELETE', $this->client->lastRequest()->getMethod());
         $this->assertSame('https://forum.example.com/api/attachments/7/?key=abc123', $this->sentUri());
+    }
+
+    public function test_it_downloads_the_file_itself(): void
+    {
+        $this->client->pushRaw(200, 'PNGDATA', [
+            'Content-Type' => 'image/png',
+            'Content-Length' => '7',
+            'Content-Disposition' => 'inline; filename="screenshot.png"',
+        ]);
+
+        $download = $this->xenforo()->attachments()->download(7, 'abc123');
+
+        $this->assertSame('PNGDATA', $download->contents());
+        $this->assertSame('screenshot.png', $download->filename);
+        $this->assertSame('image/png', $download->contentType);
+        $this->assertSame(7, $download->size);
+        $this->assertSame('https://forum.example.com/api/attachments/7/data?key=abc123', $this->sentUri());
+    }
+
+    /**
+     * The body of a download is not JSON, so nothing must try to decode it - and it must
+     * not be read into a string on the way past either, since the whole point of the
+     * separate path is an attachment larger than memory.
+     */
+    public function test_the_downloaded_body_is_handed_over_unread(): void
+    {
+        $this->client->pushRaw(200, 'PNGDATA', ['Content-Type' => 'image/png']);
+
+        $download = $this->xenforo()->attachments()->download(7);
+
+        $this->assertSame(0, $download->stream->tell(), 'The stream should not have been read yet.');
+        $this->assertSame('PNGDATA', $download->contents());
+    }
+
+    public function test_a_download_can_go_straight_to_disk(): void
+    {
+        $this->client->pushRaw(200, str_repeat('x', 20000), ['Content-Type' => 'application/octet-stream']);
+
+        $path = tempnam(sys_get_temp_dir(), 'xf-download-');
+
+        try {
+            $written = $this->xenforo()->attachments()->download(7)->saveTo($path);
+
+            $this->assertSame(20000, $written);
+            $this->assertSame(20000, filesize($path));
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /**
+     * A 304 or a redirect means the body is not the file. Returning an empty Download would
+     * write an empty file and say nothing.
+     */
+    public function test_anything_but_a_200_on_a_download_is_refused(): void
+    {
+        $this->client->pushRaw(304, '', []);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('answered 304 rather than the attachment');
+
+        $this->xenforo()->attachments()->download(7);
+    }
+
+    public function test_a_thumbnail_url_comes_out_of_the_redirect(): void
+    {
+        $this->client->pushRaw(301, '', ['Location' => 'https://forum.example.com/data/thumb/7.jpg']);
+
+        $this->assertSame(
+            'https://forum.example.com/data/thumb/7.jpg',
+            $this->xenforo()->attachments()->thumbnailUrl(7)
+        );
+
+        $this->assertSame('https://forum.example.com/api/attachments/7/thumbnail', $this->sentUri());
+    }
+
+    public function test_the_retina_thumbnail_is_its_own_endpoint(): void
+    {
+        $this->client->pushRaw(301, '', ['Location' => 'https://forum.example.com/data/thumb/7@2x.jpg']);
+
+        $this->assertSame(
+            'https://forum.example.com/data/thumb/7@2x.jpg',
+            $this->xenforo()->attachments()->retinaThumbnailUrl(7)
+        );
+
+        $this->assertSame(
+            'https://forum.example.com/api/attachments/7/retina-thumbnail',
+            $this->sentUri()
+        );
+    }
+
+    public function test_an_attachment_with_no_thumbnail_answers_null(): void
+    {
+        $this->client->pushError(404, [['code' => 'not_found']]);
+
+        $this->assertNull($this->xenforo()->attachments()->thumbnailUrl(7));
+    }
+
+    /**
+     * Where the client followed the 301 there is no way to recover the URL from a PSR-7
+     * response, so this says so rather than returning something invented.
+     */
+    public function test_a_followed_redirect_is_reported_rather_than_guessed_at(): void
+    {
+        $this->client->pushRaw(200, 'JPEGDATA', ['Content-Type' => 'image/jpeg']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('the HTTP client followed it');
+
+        $this->xenforo()->attachments()->thumbnailUrl(7);
     }
 
     public function test_find_answers_null_where_get_would_raise(): void

@@ -154,10 +154,39 @@ Two things follow from multipart that are worth knowing:
   image**, because the encoding is a property of the endpoint rather than of the call.
 
 Not wrapped yet: XenForo Media Gallery's `POST media/` and the two add-on `feature`
-endpoints, which need XFMG and XFRM resources this package does not have; and the three
-attachment endpoints that answer in something other than JSON — `attachments/{id}/data`
-returns the raw file and the thumbnail endpoints answer with a 301. All of them are
-reachable through `connection()`.
+endpoints, which need XFMG and XFRM resources this package does not have. Both are reachable
+through `connection()->postMultipart()`.
+
+## Downloading files
+
+`attachments/{id}/data` answers with the file rather than with JSON, so it goes through
+`Connection::sendRaw()` — the response comes back whole, with its body stream unread:
+
+```php
+$download = $xf->attachments()->download($attachmentId);
+
+$download->saveTo('/tmp/' . $attachmentId . '.bin');   // a chunk at a time
+$download->contents();                                 // or the lot, as a string
+$download->filename;                                   // what the forum called it
+$download->contentType;                                // what it will serve it as
+```
+
+`download()` never reads the body itself, so a 40MB attachment goes to disk without ever
+being a PHP string. The name and type come from the response rather than from the
+`Attachment` entity and answer a slightly different question: XenForo decides at download
+time whether a file is safe to display inline, so an image comes back as its real type and
+anything else as `application/octet-stream`, whatever it really is.
+
+An attachment that has not been associated with content yet needs the key it was uploaded
+against — `download($id, $key)` — for the same reason reading its record does.
+
+The two thumbnail endpoints answer with a **301** whose `Location` header is the entire
+output, so `thumbnailUrl()` and `retinaThumbnailUrl()` only work through an HTTP client that
+does not follow redirects, and a PSR-18 client is free to follow them — most do by default.
+Where the client has followed one there is no way to recover the URL from a PSR-7 response,
+and the methods say so rather than guess. **`$xf->attachments()->get($id)->thumbnail_url` is
+the same answer** out of a request you have probably already made, and it does not depend on
+how the client is configured; prefer it.
 
 ## Errors
 

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Exercise: upload a real file to a real forum, and find out what it judged it by. Writes.
+ * Exercise: upload a file to a real forum, read it back, and see what it judged it by. Writes.
  *
  * Multipart is the one thing in this package a stubbed test cannot settle. The suite takes
  * the body apart again and proves it is well formed by the boundary its own header
@@ -19,7 +19,12 @@
  *      user's permission against the context, so a context that arrived empty is refused
  *      as a permission failure rather than reported as a lost field. A key coming back at
  *      all is the answer.
- *   3. Is the FILENAME really what the forum judges, rather than the Content-Type the part
+ *   3. Do the bytes come back? attachments/{id}/data answers with the file rather than
+ *      with JSON, so it goes through a different path in Connection - and a round trip is
+ *      the only check that says the upload and the download agree. The comparison is on a
+ *      hash of the bytes, not on their length, because a body mangled in transit is
+ *      overwhelmingly likely to keep its length and change its content.
+ *   4. Is the FILENAME really what the forum judges, rather than the Content-Type the part
  *      declares? Upload::DEFAULT_CONTENT_TYPE rests on that claim. Two uploads of the same
  *      bytes settle it: one named .png declaring application/octet-stream, one named .zzz
  *      declaring image/png. If the filename decides, the first is accepted and the second
@@ -77,7 +82,7 @@ $io->value('mode', $description);
 // withheld the environment file entirely.
 if (!$proceed) {
     $io->line();
-    $io->warn('Nothing was sent, so this run answers none of the three questions above -');
+    $io->warn('Nothing was sent, so this run answers none of the four questions above -');
     $io->warn('in particular it does NOT show that a real forum accepts the body this builds.');
 
     exit(0);
@@ -131,6 +136,7 @@ $io->line();
 $uploaded = [];
 $failure = null;
 $leaked = false;
+$mismatch = false;
 $key = null;
 
 try {
@@ -171,8 +177,37 @@ try {
     $io->success(sprintf('   ✓ %d attachment(s) readable against the key', count($listed)));
     $io->line();
 
-    // THE SECOND HALF OF QUESTION 3.
-    $io->info('3. the same bytes named .zzz declaring image/png');
+    // QUESTION 3. The download path, and the only end-to-end check there is.
+    $io->info('3. attachments/{id}/data, reading the same file back');
+
+    if ($accepted->attachment_id === null) {
+        $io->error('   ✗ the upload came back without an attachment_id, so there is nothing to read');
+
+        $mismatch = true;
+    } else {
+        $download = $xf->attachments()->download($accepted->attachment_id, $key);
+        $returned = $download->contents();
+
+        $io->values([
+            'content type' => $download->contentType,
+            'filename' => $download->filename,
+            'bytes' => strlen($returned),
+        ]);
+
+        if (hash('sha256', $returned) === hash('sha256', $png)) {
+            $io->success('   ✓ byte-for-byte identical to what went up');
+        } else {
+            $io->error('   ✗ THE BYTES CHANGED. Compare the length above against the upload, and');
+            $io->error('     suspect the multipart framing or the download path before the forum.');
+
+            $mismatch = true;
+        }
+    }
+
+    $io->line();
+
+    // THE SECOND HALF OF QUESTION 4.
+    $io->info('4. the same bytes named .zzz declaring image/png');
 
     try {
         $refused = $xf->attachments()->upload(
@@ -227,6 +262,6 @@ try {
     }
 }
 
-if ($failure !== null || $leaked) {
+if ($failure !== null || $leaked || $mismatch) {
     exit(1);
 }

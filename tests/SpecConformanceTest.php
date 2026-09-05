@@ -99,6 +99,7 @@ final class SpecConformanceTest extends BaseTestCase
     {
         $methods = [
             'apiGet' => 'GET',
+            'apiGetRaw' => 'GET',
             'apiPaginate' => 'GET',
             'apiEach' => 'GET',
             'apiFind' => 'GET',
@@ -107,14 +108,15 @@ final class SpecConformanceTest extends BaseTestCase
             'apiDelete' => 'DELETE',
             'apiUpload' => 'POST',
             'get' => 'GET',
+            'getRaw' => 'GET',
             'post' => 'POST',
             'put' => 'PUT',
             'delete' => 'DELETE',
             'postMultipart' => 'POST',
         ];
 
-        $pattern = '/(?:\$this->(api(?:Get|Post|Put|Delete|Upload|Paginate|Each|Find))'
-            . '|\$this->connection->(get|post|put|delete|postMultipart))'
+        $pattern = '/(?:\$this->(api(?:GetRaw|Get|Post|Put|Delete|Upload|Paginate|Each|Find))'
+            . '|\$this->connection->(getRaw|get|post|put|delete|postMultipart))'
             . '\(\s*((?:\'(?:[^\'\\\\]|\\\\.)*\'|\s*\.\s*|\$[A-Za-z_]\w*)+)/';
 
         $calls = [];

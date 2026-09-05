@@ -8,6 +8,7 @@ use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
 use Hampel\XenForo\Api\Config;
 use Hampel\XenForo\Api\Connection;
+use Hampel\XenForo\Api\Exception\ApiException;
 use Hampel\XenForo\Api\Exception\ClientException;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
 use Hampel\XenForo\Api\Exception\NotAuthenticatedException;
@@ -121,6 +122,64 @@ final class ConnectionTest extends TestCase
             'https://forum.example.com/api/me/avatar?api_bypass_permissions=1',
             $this->sentUri()
         );
+    }
+
+    /**
+     * send() reads the whole body to decode it, which is the wrong thing to do to a 40MB
+     * attachment. getRaw() hands the response over with its stream untouched.
+     */
+    public function test_a_raw_get_does_not_read_or_decode_the_body(): void
+    {
+        $this->client->pushRaw(200, 'PNGDATA', ['Content-Type' => 'image/png']);
+
+        $response = $this->connection()->getRaw('attachments/7/data');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(0, $response->getBody()->tell(), 'Nothing should have read the body yet.');
+        $this->assertSame('PNGDATA', (string) $response->getBody());
+    }
+
+    /**
+     * A 301 IS the output of the thumbnail endpoints - the URL is in the Location header -
+     * so sendRaw() has to hand a redirect back where send() throws on one.
+     */
+    public function test_a_redirect_is_an_answer_to_a_raw_get_and_an_error_to_a_decoded_one(): void
+    {
+        $this->client->pushRaw(301, '', ['Location' => 'https://forum.example.com/data/thumb/7.jpg']);
+
+        $this->assertSame(301, $this->connection()->getRaw('attachments/7/thumbnail')->getStatusCode());
+
+        $this->client->pushRaw(301, '', ['Location' => 'https://forum.example.com/data/thumb/7.jpg']);
+
+        $this->expectException(ApiException::class);
+
+        $this->connection()->get('attachments/7/thumbnail');
+    }
+
+    /**
+     * The error body on these endpoints is still JSON - it is rendered by the API renderer
+     * rather than by the attachment view - so the codes survive the raw path.
+     */
+    public function test_a_raw_get_still_raises_the_usual_exception_with_its_codes(): void
+    {
+        $this->client->pushError(403, [['code' => 'do_not_have_permission']]);
+
+        try {
+            $this->connection()->getRaw('attachments/7/data');
+
+            $this->fail('A 403 should have raised.');
+        } catch (NotPermittedException $e) {
+            $this->assertTrue($e->hasCode('do_not_have_permission'));
+        }
+    }
+
+    public function test_a_transport_failure_on_a_raw_get_is_still_a_transport_failure(): void
+    {
+        $this->client->push(new TransportFailure('the forum is not answering'));
+
+        $this->expectException(RequestException::class);
+
+        $this->connection()->getRaw('attachments/7/data');
     }
 
     /**

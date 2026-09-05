@@ -23,8 +23,8 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
 | `src/Resource/` | hand-written endpoint groups, and the `Resource` base class |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
-| `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo` |
-| `src/Upload.php`, `src/Multipart.php` | files, and the `multipart/form-data` body that carries them |
+| `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo`, `Download` |
+| `src/Upload.php`, `src/Multipart.php` | files going out, and the `multipart/form-data` body that carries them |
 | `src/Support/Payload.php` | field naming, shared by both body encodings |
 | `resources/openapi.json` | XenForo's own specification, pinned |
 | `tools/generate-schemas.php` | the generator |
@@ -75,6 +75,12 @@ something should say so.
   nothing else, and `convertCustomMethodPhpInput()` parses one encoding and knows nothing
   about files - so a multipart PUT arrives with neither its files nor its fields and
   answers 200 having done nothing. `Connection::withMultipart()` refuses a non-POST.
+- **Three endpoints do not answer in JSON.** `attachments/{id}/data` returns the file on a
+  200; the two thumbnail endpoints return a **301** whose `Location` is the whole output.
+  `Connection::sendRaw()` is the path for those - it hands the response back undecoded and
+  treats a redirect as a success, where `send()` throws on one. Note the thumbnail
+  endpoints only work through a client that does not follow redirects; the same URLs are on
+  the `Attachment` entity, which is why the methods say to prefer that.
 - **A file is judged by its filename, not by its declared type.** `getFile()` builds its
   `\XF\Http\Upload` from the temporary file and the filename; the part's own Content-Type
   is read in one case only, a part named `blob`. So `Upload` defaults to
@@ -106,8 +112,9 @@ rejected login is still a login attempt, so it is opt-in:
 XENFORO_PROBE=1 vendor/bin/rig encoding
 ```
 
-`upload` genuinely writes: it uploads two files and deletes them again, which is the only
-way to find out whether a real forum accepts the multipart body this package builds.
+`upload` genuinely writes: it uploads two files, reads one back and deletes them again,
+which is the only way to find out whether a real forum accepts the multipart body this
+package builds and returns the same bytes through the download path.
 
 ```bash
 XENFORO_UPLOAD=1 vendor/bin/rig upload

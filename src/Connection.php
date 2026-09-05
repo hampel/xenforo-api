@@ -15,6 +15,7 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -246,9 +247,108 @@ final class Connection
     }
 
     /**
+     * A GET whose answer is not JSON.
+     *
+     * Three endpoints in the API are like this - `attachments/{id}/data` returns the file
+     * itself, and the two thumbnail endpoints answer with a 301 to an image - so the
+     * response comes back whole rather than decoded. See sendRaw().
+     *
+     * @param  array<string, scalar|array<mixed>|null>  $query
+     */
+    public function getRaw(string $path, array $query = []): ResponseInterface
+    {
+        return $this->sendRaw($this->request('GET', $path, $query));
+    }
+
+    /**
      * Send a request that was built elsewhere, with this connection's error handling.
      */
     public function send(RequestInterface $request): ApiResponse
+    {
+        $response = $this->dispatch($request);
+
+        $status = $response->getStatusCode();
+        $body = (string) $response->getBody();
+        $decoded = self::decode($body);
+        $meta = ResponseMeta::fromResponse($response);
+
+        if ($status >= 200 && $status < 300) {
+            $this->noteVersion($meta);
+
+            return new ApiResponse($decoded ?? [], $status, $meta);
+        }
+
+        $this->logger->error('XenForo API error response', [
+            'method' => $request->getMethod(),
+            'uri' => (string) $request->getUri(),
+            'status' => $status,
+            'body' => $decoded ?? $body,
+        ]);
+
+        throw ApiException::fromResponse(
+            $request->getMethod(),
+            (string) $request->getUri(),
+            $response,
+            $decoded,
+            $body
+        );
+    }
+
+    /**
+     * The same send, without reading the body.
+     *
+     * send() reads the whole response into a string to decode it, which is exactly wrong
+     * for a 40MB attachment - so this hands back the PSR-7 response with its body stream
+     * untouched, and the caller decides whether to read it, copy it to disk or throw it
+     * away.
+     *
+     * A REDIRECT IS A SUCCESS HERE, which is the other difference. `attachments/{id}/data`
+     * answers 304 to a conditional request, and the thumbnail endpoints answer 301 with the
+     * image's URL in the Location header - that redirect IS the documented output, so
+     * turning it into an exception the way send() does would discard the answer. Whether it
+     * ever reaches the caller depends on the injected client: a PSR-18 client is free to
+     * follow redirects, and most do by default.
+     *
+     * A 4xx or 5xx still throws. Those bodies are JSON even on these endpoints, because the
+     * error is rendered by the API renderer rather than by the attachment view.
+     */
+    public function sendRaw(RequestInterface $request): ResponseInterface
+    {
+        $response = $this->dispatch($request);
+
+        $status = $response->getStatusCode();
+
+        if ($status < 400) {
+            $this->noteVersion(ResponseMeta::fromResponse($response));
+
+            return $response;
+        }
+
+        $body = (string) $response->getBody();
+        $decoded = self::decode($body);
+
+        $this->logger->error('XenForo API error response', [
+            'method' => $request->getMethod(),
+            'uri' => (string) $request->getUri(),
+            'status' => $status,
+            'body' => $decoded ?? $body,
+        ]);
+
+        throw ApiException::fromResponse(
+            $request->getMethod(),
+            (string) $request->getUri(),
+            $response,
+            $decoded,
+            $body
+        );
+    }
+
+    /**
+     * Everything both of the above do before they differ: log it, send it, and keep a
+     * transport failure distinct from an HTTP status. A PSR-18 client throws only for the
+     * former, which is what makes that separation free.
+     */
+    private function dispatch(RequestInterface $request): ResponseInterface
     {
         $method = $request->getMethod();
         $uri = (string) $request->getUri();
@@ -256,7 +356,7 @@ final class Connection
         $this->logger->debug('XenForo API request', ['method' => $method, 'uri' => $uri]);
 
         try {
-            $response = $this->client->sendRequest($request);
+            return $this->client->sendRequest($request);
         } catch (ClientExceptionInterface $e) {
             $this->logger->error('XenForo API request failed', [
                 'method' => $method,
@@ -266,30 +366,17 @@ final class Connection
 
             throw RequestException::for($method, $uri, $e);
         }
+    }
 
-        $status = $response->getStatusCode();
-        $body = (string) $response->getBody();
-        $decoded = self::decode($body);
-        $meta = ResponseMeta::fromResponse($response);
-
-        if ($status >= 200 && $status < 300) {
-            if ($meta->isOutdated()) {
-                // Not a warning about anything broken - nothing here has failed - but the
-                // only notice a client ever gets that the forum has a newer API.
-                $this->logger->info('XenForo API version is behind the forum', $meta->toArray());
-            }
-
-            return new ApiResponse($decoded ?? [], $status, $meta);
+    /**
+     * Not a warning about anything broken - nothing has failed - but the only notice a
+     * client ever gets that the forum has a newer API.
+     */
+    private function noteVersion(ResponseMeta $meta): void
+    {
+        if ($meta->isOutdated()) {
+            $this->logger->info('XenForo API version is behind the forum', $meta->toArray());
         }
-
-        $this->logger->error('XenForo API error response', [
-            'method' => $method,
-            'uri' => $uri,
-            'status' => $status,
-            'body' => $decoded ?? $body,
-        ]);
-
-        throw ApiException::fromResponse($method, $uri, $response, $decoded, $body);
     }
 
 
