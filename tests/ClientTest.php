@@ -21,6 +21,8 @@ use Hampel\XenForo\Api\Resource\MediaCategories;
 use Hampel\XenForo\Api\Resource\MediaComments;
 use Hampel\XenForo\Api\Resource\Nodes;
 use Hampel\XenForo\Api\Resource\Posts;
+use Hampel\XenForo\Api\Resource\ProfilePostComments;
+use Hampel\XenForo\Api\Resource\ProfilePosts;
 use Hampel\XenForo\Api\Resource\ResourceCategories;
 use Hampel\XenForo\Api\Resource\ResourceItems;
 use Hampel\XenForo\Api\Resource\ResourceReviews;
@@ -103,6 +105,8 @@ final class ClientTest extends TestCase
             'conversations' => Conversations::class,
             'conversationMessages' => ConversationMessages::class,
             'alerts' => Alerts::class,
+            'profilePosts' => ProfilePosts::class,
+            'profilePostComments' => ProfilePostComments::class,
             'search' => Search::class,
             'attachments' => Attachments::class,
             'media' => Media::class,

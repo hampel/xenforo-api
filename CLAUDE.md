@@ -21,7 +21,7 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Client.php` | the entry point; named accessors and `resource()` |
 | `src/Connection.php` | everything that touches HTTP |
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
-| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class |
+| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - 150 of the API's 162 endpoints |
 | `src/Resource/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
 | `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo`, `Download` |

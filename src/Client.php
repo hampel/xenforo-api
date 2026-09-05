@@ -21,6 +21,8 @@ use Hampel\XenForo\Api\Resource\MediaCategories;
 use Hampel\XenForo\Api\Resource\MediaComments;
 use Hampel\XenForo\Api\Resource\Nodes;
 use Hampel\XenForo\Api\Resource\Posts;
+use Hampel\XenForo\Api\Resource\ProfilePostComments;
+use Hampel\XenForo\Api\Resource\ProfilePosts;
 use Hampel\XenForo\Api\Resource\Resource;
 use Hampel\XenForo\Api\Resource\ResourceCategories;
 use Hampel\XenForo\Api\Resource\ResourceItems;
@@ -225,6 +227,16 @@ final class Client
     public function attachments(): Attachments
     {
         return $this->resource(Attachments::class);
+    }
+
+    public function profilePosts(): ProfilePosts
+    {
+        return $this->resource(ProfilePosts::class);
+    }
+
+    public function profilePostComments(): ProfilePostComments
+    {
+        return $this->resource(ProfilePostComments::class);
     }
 
     public function search(): Search

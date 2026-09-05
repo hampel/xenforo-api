@@ -55,6 +55,29 @@ $info->keyType;            // 'guest', 'user' or 'super'
 $info->hasScope('user:write');
 ```
 
+## What is wrapped
+
+150 of the API's 162 endpoints, through these accessors:
+
+| | |
+|---|---|
+| `index()` `auth()` `me()` | the forum, the credential, and the user it acts as |
+| `users()` `alerts()` | members, their profile posts, their alerts |
+| `nodes()` `forums()` | the node tree, and forums within it |
+| `threads()` `posts()` | threads, their posts, and everything done to them |
+| `profilePosts()` `profilePostComments()` | profile posts and their replies |
+| `conversations()` `conversationMessages()` | private conversations |
+| `attachments()` | uploads, downloads, and the keys they go against |
+| `search()` | search, and re-reading a previous result |
+| `media()` `mediaAlbums()` `mediaCategories()` `mediaComments()` | XenForo Media Gallery |
+| `resourceItems()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
+
+Not wrapped: the OAuth2 token endpoints — the credentials themselves are, see
+[Authenticating](#authenticating) — oEmbed, stats, featured content, search forums,
+conversation labels, and `threads/{id}/change-type`.
+All of them are one `connection()->get()` or `->post()` away, and a `Resource` subclass is
+how to make that permanent — see [Extending it](#extending-it-for-add-on-endpoints).
+
 ## Authenticating
 
 XenForo accepts four credentials on the same endpoints, and which one you hold changes what
