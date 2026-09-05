@@ -105,14 +105,16 @@ final class SpecConformanceTest extends BaseTestCase
             'apiPost' => 'POST',
             'apiPut' => 'PUT',
             'apiDelete' => 'DELETE',
+            'apiUpload' => 'POST',
             'get' => 'GET',
             'post' => 'POST',
             'put' => 'PUT',
             'delete' => 'DELETE',
+            'postMultipart' => 'POST',
         ];
 
-        $pattern = '/(?:\$this->(api(?:Get|Post|Put|Delete|Paginate|Each|Find))'
-            . '|\$this->connection->(get|post|put|delete))'
+        $pattern = '/(?:\$this->(api(?:Get|Post|Put|Delete|Upload|Paginate|Each|Find))'
+            . '|\$this->connection->(get|post|put|delete|postMultipart))'
             . '\(\s*((?:\'(?:[^\'\\\\]|\\\\.)*\'|\s*\.\s*|\$[A-Za-z_]\w*)+)/';
 
         $calls = [];

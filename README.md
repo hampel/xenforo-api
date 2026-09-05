@@ -109,6 +109,56 @@ Use it rather than writing the loop by hand. **Asking XenForo for a page past th
 is an error, not an empty result** — `invalid_page`, HTTP 400 — so the obvious "fetch until
 it comes back empty" ends every complete traversal in an exception.
 
+## Uploading files
+
+Attachments, avatars and featured-content images are sent as `multipart/form-data`, and an
+`Upload` describes the file without reading it — the bytes are streamed through your PSR-17
+factory when the body is built, so an attachment larger than memory costs nothing extra.
+
+```php
+use Hampel\XenForo\Api\Upload;
+
+$xf->me()->uploadAvatar(Upload::fromPath('/tmp/avatar.png'));
+```
+
+An attachment cannot be posted with the content it belongs to. It goes up first, against a
+key, and the key is handed to whatever creates the content:
+
+```php
+$key = $xf->attachments()->newKey('post', ['thread_id' => 42])['key'];
+
+$xf->attachments()->upload($key, Upload::fromPath('/tmp/screenshot.png'));
+
+$xf->posts()->create(42, 'See attached', $key);
+```
+
+The `context` a key is created with is what the forum checks permission against, so it has
+to describe the content the attachment will end up on — `thread_id` for a reply, `post_id`
+for an edit, `node_id` for a new thread. A wrong context is refused when the key is created
+rather than when it is used.
+
+`Upload::fromString()` and `Upload::fromStream()` cover content this process already holds.
+The content type an upload declares is **not** what XenForo judges it by: `getFile()` builds
+its `\XF\Http\Upload` from the temporary file and the filename, so it is the extension
+that decides whether the forum accepts the file at all. Get the filename right; the type
+defaults to `application/octet-stream` and that is honest.
+
+Two things follow from multipart that are worth knowing:
+
+- **It is POST-only, structurally.** PHP populates `$_FILES` for a POST and nothing else,
+  and XenForo's fallback for the other methods parses one encoding and has no concept of a
+  file — so a multipart PUT arrives carrying neither its files nor its fields and answers
+  200 having done nothing. `Connection::withMultipart()` refuses a non-POST rather than
+  send one.
+- **`POST threads/{id}/feature` takes a multipart body whether or not you give it an
+  image**, because the encoding is a property of the endpoint rather than of the call.
+
+Not wrapped yet: XenForo Media Gallery's `POST media/` and the two add-on `feature`
+endpoints, which need XFMG and XFRM resources this package does not have; and the three
+attachment endpoints that answer in something other than JSON — `attachments/{id}/data`
+returns the raw file and the thumbnail endpoints answer with a 301. All of them are
+reachable through `connection()`.
+
 ## Errors
 
 ```php
@@ -199,11 +249,15 @@ nothing is ever lost for not being in a specification.
 - **The API is GET, POST and DELETE.** There are no PUT or PATCH endpoints, and no non-POST
   endpoint takes a body — DELETE takes query parameters. Every write is a POST, including
   what would elsewhere be an update.
-- **Bodies are form-encoded, never JSON.** XenForo will read a JSON body, but only on POST,
-  so a JSON-first client works for creates and silently does nothing for updates. This
-  package sends form-encoded throughout and writes the `Content-Type` itself, exactly, with
-  no `charset` parameter — on a PUT, PATCH or DELETE, XenForo compares that header with
-  `===` and a decorated one makes the body vanish with no error at all.
+- **Bodies are form-encoded, never JSON** — or multipart, for the eight endpoints that take
+  a file. XenForo will read a JSON body, but only on POST, so a JSON-first client works for
+  creates and silently does nothing for updates. This package sends form-encoded otherwise
+  and writes the `Content-Type` itself, exactly, with no `charset` parameter — on a PUT,
+  PATCH or DELETE, XenForo compares that header with `===` and a decorated one makes the
+  body vanish with no error at all.
+- **A file is judged by its filename, not by the type it declares.** XenForo reads the
+  part's own `Content-Type` in exactly one case — a part named `blob`, where it invents an
+  extension for a file the browser did not name.
 - **A missing API key is not a 401.** XenForo treats it as a guest and carries on, so
   unauthenticated endpoints answer normally.
 - **Every response carries `XF-Used-Api-Version` and `XF-Latest-Api-Version`**, reachable on

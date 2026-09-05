@@ -15,6 +15,7 @@ use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Exception\NotPermittedException;
 use Hampel\XenForo\Api\Exception\RequestException;
 use Hampel\XenForo\Api\Exception\ServerException;
+use Hampel\XenForo\Api\Upload;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ConnectionTest extends TestCase
@@ -57,6 +58,72 @@ final class ConnectionTest extends TestCase
     }
 
     /**
+     * The mirror image of the Content-Type rule above, reached by a different road.
+     *
+     * PHP populates $_FILES for a POST and for nothing else, and XenForo's own fallback for
+     * the other methods - convertCustomMethodPhpInput() - parses one encoding and has no
+     * concept of a file. A multipart PUT therefore arrives carrying neither its files nor
+     * its fields, and answers 200 having done nothing. Refused here rather than sent,
+     * because there is nothing about the response that would tell a caller.
+     */
+    #[DataProvider('nonPostMethods')]
+    public function test_a_multipart_body_is_refused_on_anything_but_a_post(string $method): void
+    {
+        $connection = $this->connection();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('A multipart body can only be sent on a POST');
+
+        $connection->withMultipart(
+            $connection->request($method, 'threads/1/'),
+            [],
+            ['image' => Upload::fromString('x', 'a.png')]
+        );
+    }
+
+    /**
+     * The likeliest way to reach for a file and miss: putting it in the payload, where a
+     * form-encoded body cannot carry it. The message says where it does belong.
+     */
+    public function test_a_file_in_a_form_payload_says_where_it_belongs(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('$files argument of Connection::postMultipart()');
+
+        $this->connection()->post('me/avatar', ['avatar' => Upload::fromString('x', 'a.png')]);
+    }
+
+    public function test_a_multipart_post_still_carries_the_credential(): void
+    {
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->connection()->postMultipart('me/avatar', [], ['avatar' => Upload::fromString('x', 'a.png')]);
+
+        $request = $this->client->lastRequest();
+
+        $this->assertSame('test-api-key', $request->getHeaderLine('XF-Api-Key'));
+        $this->assertSame('application/json', $request->getHeaderLine('Accept'));
+        $this->assertStringStartsWith('multipart/form-data; boundary="', $request->getHeaderLine('Content-Type'));
+    }
+
+    public function test_a_multipart_post_takes_query_parameters_too(): void
+    {
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->connection()->postMultipart(
+            'me/avatar',
+            [],
+            ['avatar' => Upload::fromString('x', 'a.png')],
+            ['api_bypass_permissions' => 1]
+        );
+
+        $this->assertSame(
+            'https://forum.example.com/api/me/avatar?api_bypass_permissions=1',
+            $this->sentUri()
+        );
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function writeMethods(): iterable
@@ -64,6 +131,17 @@ final class ConnectionTest extends TestCase
         yield 'post' => ['post'];
         yield 'put' => ['put'];
         yield 'patch' => ['patch'];
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function nonPostMethods(): iterable
+    {
+        yield 'put' => ['PUT'];
+        yield 'patch' => ['PATCH'];
+        yield 'delete' => ['DELETE'];
+        yield 'get' => ['GET'];
     }
 
     public function test_bodies_are_form_encoded_not_json(): void

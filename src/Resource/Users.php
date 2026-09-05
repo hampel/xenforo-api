@@ -7,6 +7,7 @@ namespace Hampel\XenForo\Api\Resource;
 use Hampel\XenForo\Api\Generated\Schema\ProfilePost;
 use Hampel\XenForo\Api\Generated\Schema\User;
 use Hampel\XenForo\Api\Result\Page;
+use Hampel\XenForo\Api\Upload;
 
 /**
  * Users - the `Users` tag in the XenForo API documentation.
@@ -165,6 +166,17 @@ final class Users extends Resource
             ProfilePost::fromArray(...),
             $page
         );
+    }
+
+    /**
+     * Replace a user's avatar. Needs a super-user key, or a key acting as that user.
+     *
+     * As Me::uploadAvatar(): the filename's extension is what the forum judges, not the
+     * content type the upload declares.
+     */
+    public function uploadAvatar(int $userId, Upload $avatar): bool
+    {
+        return $this->apiUpload('users/' . $userId . '/avatar', [], ['avatar' => $avatar])->isSuccess();
     }
 
     public function deleteAvatar(int $userId): bool

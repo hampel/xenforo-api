@@ -10,6 +10,7 @@ use Hampel\XenForo\Api\Exception\InvalidArgumentException;
 use Hampel\XenForo\Api\Exception\RequestException;
 use Hampel\XenForo\Api\Result\ApiResponse;
 use Hampel\XenForo\Api\Result\ResponseMeta;
+use Hampel\XenForo\Api\Support\Payload;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -57,9 +58,17 @@ final class Connection
      *
      * The same `===` comparison governs ::getPhpInputJson(), which also accepts only POST -
      * so a JSON-bodied client would work for creates and quietly do nothing for updates.
-     * This package sends form-encoded bodies throughout and never meets that either.
+     * This package never sends JSON: everything is form-encoded, bar the handful of
+     * endpoints that take a file and declare multipart, so it never meets that either.
      */
     public const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
+
+    /**
+     * The other body encoding, and the mirror image of the rule above: this one MUST carry
+     * a parameter, because the boundary is the only way the far end can find where the
+     * parts start. Multipart::contentType() writes the whole header.
+     */
+    public const MULTIPART_CONTENT_TYPE = 'multipart/form-data';
 
     public function __construct(
         private readonly Config $config,
@@ -83,9 +92,9 @@ final class Connection
 
     /**
      * The injected transport, exposed rather than hidden because a caller assembling
-     * something this class does not cover needs the same factories to do it - a multipart
-     * upload, most of all, which has to build its own body but should still go out through
-     * the application's own HTTP client.
+     * something this class does not cover - an add-on endpoint that answers in something
+     * other than JSON, most likely - needs the same client and the same factories to do
+     * it, rather than reaching for an HTTP library of its own.
      */
     public function client(): ClientInterface
     {
@@ -117,6 +126,55 @@ final class Connection
     public function post(string $path, array $payload = [], array $query = []): ApiResponse
     {
         return $this->send($this->withForm($this->request('POST', $path, $query), $payload));
+    }
+
+    /**
+     * Upload one or more files: an attachment, an avatar, a featured-content image.
+     *
+     * POST only, and there is deliberately no putMultipart() beside put(). PHP populates
+     * $_FILES for a POST and for nothing else, and XenForo's own fallback for the other
+     * methods - \XF\Http\Request::convertCustomMethodPhpInput() - parses one encoding,
+     * `application/x-www-form-urlencoded`, and has no concept of a file at all. A multipart
+     * PUT therefore arrives with no files AND no fields, and answers 200 having done
+     * nothing, which is the same silent failure FORM_CONTENT_TYPE is about, reached by a
+     * different road. An add-on cannot fix that from its controller; it is upstream of
+     * anything an add-on gets to see.
+     *
+     * @param  array<string, mixed>  $payload  the ordinary fields, named as they would be
+     *                                         in a form-encoded body
+     * @param  array<string, Upload>  $files  keyed by the input name the endpoint reads
+     * @param  array<string, scalar|array<mixed>|null>  $query
+     */
+    public function postMultipart(string $path, array $payload = [], array $files = [], array $query = []): ApiResponse
+    {
+        return $this->send($this->withMultipart($this->request('POST', $path, $query), $payload, $files));
+    }
+
+    /**
+     * Attach a multipart body to a request built elsewhere.
+     *
+     * The method is checked rather than trusted, because the failure it prevents is
+     * invisible: see postMultipart() above. A caller who has genuinely found an add-on
+     * endpoint that reads a file from a PUT has found a XenForo bug, not a limitation here.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, Upload>  $files
+     */
+    public function withMultipart(RequestInterface $request, array $payload, array $files): RequestInterface
+    {
+        if ($request->getMethod() !== 'POST') {
+            throw new InvalidArgumentException(sprintf(
+                'A multipart body can only be sent on a POST, not a %s: PHP parses uploads for POST alone, so '
+                    . 'the request would arrive at the forum carrying neither its files nor its fields.',
+                $request->getMethod()
+            ));
+        }
+
+        $multipart = new Multipart($payload, $files);
+
+        return $request
+            ->withHeader('Content-Type', $multipart->contentType())
+            ->withBody($multipart->stream($this->streamFactory));
     }
 
     /**
@@ -160,9 +218,8 @@ final class Connection
     }
 
     /**
-     * Build a request without sending it - for a caller assembling something this class
-     * does not cover, a multipart upload most of all. The credential and the Accept header
-     * are already applied.
+     * Build a request without sending it, for a caller assembling something this class does
+     * not cover. The credential and the Accept header are already applied.
      *
      * @param  array<string, scalar|array<mixed>|null>  $query
      */
@@ -185,7 +242,7 @@ final class Connection
     {
         return $request
             ->withHeader('Content-Type', self::FORM_CONTENT_TYPE)
-            ->withBody($this->streamFactory->createStream(self::encode($payload)));
+            ->withBody($this->streamFactory->createStream(Payload::encode($payload)));
     }
 
     /**
@@ -235,54 +292,6 @@ final class Connection
         throw ApiException::fromResponse($method, $uri, $response, $decoded, $body);
     }
 
-    /**
-     * XenForo reads input with parse_str(), so a nested payload is PHP's bracket notation
-     * and booleans have to be the 1/0 that its `bool` filter understands - http_build_query
-     * would otherwise drop `false` to an empty string, which XenForo reads as false too,
-     * but only by accident.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    private static function encode(array $payload): string
-    {
-        return Config::buildQuery(self::normalise($payload));
-    }
-
-    /**
-     * @param  array<mixed>  $payload
-     * @return array<mixed>
-     */
-    private static function normalise(array $payload): array
-    {
-        $normalised = [];
-
-        foreach ($payload as $key => $value) {
-            if ($value === null) {
-                // A key with no value is not the same as an absent key: XenForo's filters
-                // coerce an empty string to 0/''/false, which for a nullable field means
-                // "set it to nothing" rather than "leave it alone". Dropping nulls makes
-                // an unset optional argument mean what a caller expects.
-                continue;
-            }
-
-            if (is_bool($value)) {
-                $normalised[$key] = $value ? '1' : '0';
-            } elseif (is_array($value)) {
-                /** @var array<mixed> $value */
-                $normalised[$key] = self::normalise($value);
-            } elseif (is_scalar($value)) {
-                $normalised[$key] = $value;
-            } else {
-                throw new InvalidArgumentException(sprintf(
-                    'Cannot send %s as the value of "%s": the XenForo API takes form-encoded scalars and arrays of them.',
-                    get_debug_type($value),
-                    (string) $key
-                ));
-            }
-        }
-
-        return $normalised;
-    }
 
     /**
      * @return array<mixed>|null  null when the body was not JSON, or was JSON but not an

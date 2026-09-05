@@ -68,6 +68,17 @@ $mode = static function (): array {
 
 $io->value('mode', $description);
 
+// Settled before the credential is looked for, so a refused run reads the same whether or
+// not one is configured - which is what an agent meets, the rig having withheld the
+// environment file entirely.
+if (!$proceed) {
+    $io->line();
+    $io->warn('Nothing was sent, so this run answers none of the questions in the docblock -');
+    $io->warn('in particular it does NOT show that the Content-Type rule still holds.');
+
+    exit(0);
+}
+
 $config = new Config(harness_forum_url($io));
 $key = getenv('XENFORO_API_KEY');
 
@@ -79,13 +90,6 @@ if (!is_string($key) || $key === '') {
 
 $io->value('forum', $config->baseUri);
 $io->line();
-
-if (!$proceed) {
-    $io->warn('Nothing was sent, so this run answers none of the questions in the docblock -');
-    $io->warn('in particular it does NOT show that the Content-Type rule still holds.');
-
-    exit(0);
-}
 
 $guzzle = new Guzzle(['http_errors' => false]);
 $factory = new HttpFactory();

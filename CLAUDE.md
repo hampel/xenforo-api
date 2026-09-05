@@ -24,6 +24,8 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Resource/` | hand-written endpoint groups, and the `Resource` base class |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
 | `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo` |
+| `src/Upload.php`, `src/Multipart.php` | files, and the `multipart/form-data` body that carries them |
+| `src/Support/Payload.php` | field naming, shared by both body encodings |
 | `resources/openapi.json` | XenForo's own specification, pinned |
 | `tools/generate-schemas.php` | the generator |
 | `harness/` | rig exercises - real calls to a real forum |
@@ -67,7 +69,16 @@ something should say so.
   what would elsewhere be an update.
 - **Bodies are form-encoded, never JSON.** XenForo will read a JSON body, but only on POST
   (`\XF\Http\Request::getPhpInputJson()`), so a JSON-first client works for creates and
-  quietly does nothing for updates.
+  quietly does nothing for updates. The exception is the eight endpoints that take a file,
+  which declare `multipart/form-data`.
+- **Multipart is POST-only, structurally.** PHP populates `$_FILES` for a POST and for
+  nothing else, and `convertCustomMethodPhpInput()` parses one encoding and knows nothing
+  about files - so a multipart PUT arrives with neither its files nor its fields and
+  answers 200 having done nothing. `Connection::withMultipart()` refuses a non-POST.
+- **A file is judged by its filename, not by its declared type.** `getFile()` builds its
+  `\XF\Http\Upload` from the temporary file and the filename; the part's own Content-Type
+  is read in one case only, a part named `blob`. So `Upload` defaults to
+  `application/octet-stream` and the extension is what has to be right.
 - **On PUT, PATCH and DELETE the Content-Type is compared with `===`.** XenForo parses
   those bodies itself in `convertCustomMethodPhpInput()` and a `; charset=utf-8` makes the
   comparison fail, discarding the body with no error. Core XenForo never meets this; an
@@ -95,8 +106,16 @@ rejected login is still a login attempt, so it is opt-in:
 XENFORO_PROBE=1 vendor/bin/rig encoding
 ```
 
-Under an agent it refuses even then, unless `XENFORO_AGENT_MAY_PROBE=1` is also set - on
-the command line, for one run, never in `.env`. See `harness/lib/agent.php`.
+`upload` genuinely writes: it uploads two files and deletes them again, which is the only
+way to find out whether a real forum accepts the multipart body this package builds.
+
+```bash
+XENFORO_UPLOAD=1 vendor/bin/rig upload
+```
+
+Under an agent both refuse even then, unless `XENFORO_AGENT_MAY_PROBE=1` or
+`XENFORO_AGENT_MAY_UPLOAD=1` is also set - on the command line, for one run, never in
+`.env`. See `harness/lib/agent.php`.
 
 **If an exercise fails for want of a credential, that is the guard working.** The rig does
 not load `.env` in an agent session. Do not go looking for the key.

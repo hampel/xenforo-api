@@ -67,6 +67,15 @@ abstract class TestCase extends BaseTestCase
         return $parsed;
     }
 
+    /**
+     * The multipart body of the last request, taken apart on the boundary its own header
+     * declares.
+     */
+    protected function sentParts(): MultipartBody
+    {
+        return MultipartBody::fromRequest($this->client->lastRequest());
+    }
+
     protected function sentBodyRaw(): string
     {
         return (string) $this->client->lastRequest()->getBody();

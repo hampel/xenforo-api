@@ -8,6 +8,7 @@ use Hampel\XenForo\Api\Authentication\Authentication;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
 use Hampel\XenForo\Api\Resource\Alerts;
+use Hampel\XenForo\Api\Resource\Attachments;
 use Hampel\XenForo\Api\Resource\Auth;
 use Hampel\XenForo\Api\Resource\ConversationMessages;
 use Hampel\XenForo\Api\Resource\Conversations;
@@ -210,6 +211,11 @@ final class Client
     public function alerts(): Alerts
     {
         return $this->resource(Alerts::class);
+    }
+
+    public function attachments(): Attachments
+    {
+        return $this->resource(Attachments::class);
     }
 
     public function search(): Search

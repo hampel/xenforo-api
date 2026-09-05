@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Tests;
 
+use Hampel\XenForo\Api\Upload;
+
 final class ThreadsTest extends TestCase
 {
     public function test_it_gets_a_thread_with_its_nested_forum(): void
@@ -55,6 +57,58 @@ final class ThreadsTest extends TestCase
         $this->assertSame(
             'https://forum.example.com/api/threads/9/?hard_delete=1&reason=spam',
             $this->sentUri()
+        );
+    }
+
+    /**
+     * The one core endpoint whose body must be multipart even when there is no file: the
+     * encoding is a property of the endpoint, not of what this particular call carries.
+     */
+    public function test_featuring_a_thread_is_multipart_with_or_without_an_image(): void
+    {
+        $this->client->pushJson(200, [
+            'success' => true,
+            'feature' => ['featured_content_id' => 4, 'content_type' => 'thread'],
+        ]);
+
+        $feature = $this->xenforo()->threads()->feature(12, ['title' => 'Pick of the week']);
+
+        $this->assertSame(4, $feature->featured_content_id);
+        $this->assertSame('thread', $feature->content_type);
+        $this->assertSame('https://forum.example.com/api/threads/12/feature', $this->sentUri());
+        $this->assertSame(['title' => 'Pick of the week'], $this->sentParts()->asInput());
+        $this->assertSame([], array_filter(
+            $this->sentParts()->parts,
+            static fn (array $part): bool => $part['filename'] !== null
+        ));
+    }
+
+    public function test_a_featured_thread_can_carry_its_own_image(): void
+    {
+        $this->client->pushJson(200, ['success' => true, 'feature' => ['featured_content_id' => 4]]);
+
+        $this->xenforo()->threads()->feature(
+            12,
+            ['unfeature_days' => 7, 'always_visible' => true],
+            Upload::fromString('PNGDATA', 'banner.png', 'image/png')
+        );
+
+        $parts = $this->sentParts();
+
+        $this->assertSame('banner.png', $parts->parts['image']['filename']);
+        $this->assertSame(['unfeature_days' => '7', 'always_visible' => '1'], $parts->asInput());
+    }
+
+    public function test_unfeaturing_is_an_ordinary_write(): void
+    {
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->assertTrue($this->xenforo()->threads()->unfeature(12));
+
+        $this->assertSame('https://forum.example.com/api/threads/12/unfeature', $this->sentUri());
+        $this->assertSame(
+            'application/x-www-form-urlencoded',
+            $this->client->lastRequest()->getHeaderLine('Content-Type')
         );
     }
 

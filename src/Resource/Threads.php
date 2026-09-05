@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Resource;
 
+use Hampel\XenForo\Api\Generated\Schema\FeaturedContent;
 use Hampel\XenForo\Api\Generated\Schema\Post;
 use Hampel\XenForo\Api\Generated\Schema\Thread;
 use Hampel\XenForo\Api\Result\Page;
+use Hampel\XenForo\Api\Upload;
 
 /**
  * Threads - the `Threads` tag in the XenForo API documentation.
@@ -125,6 +127,40 @@ final class Threads extends Resource
     {
         return $this->apiPost('threads/' . $threadId . '/mark-read', $date === null ? [] : ['date' => $date])
             ->isSuccess();
+    }
+
+    /**
+     * Feature a thread on the forum's featured-content list, optionally with an image.
+     *
+     * The image is why this endpoint takes a multipart body at all: everything else here
+     * is an ordinary field, and passing no image makes it an ordinary write that still has
+     * to be sent as multipart, because that is the encoding the endpoint declares.
+     *
+     * NEWER THAN 2.3. The featured-content API is in XenForo's published specification but
+     * not in 2.3 - a 2.3.12 install has no such route and answers 404, though its front end
+     * features threads perfectly well. Check Index::get()->version before assuming a 404
+     * here means the thread is missing.
+     *
+     * @param  array<string, mixed>  $options  title, snippet, date, unfeature_days,
+     *         always_visible - all optional, all overriding what the forum would derive
+     */
+    public function feature(int $threadId, array $options = [], ?Upload $image = null): FeaturedContent
+    {
+        return FeaturedContent::fromArray(
+            $this->apiUpload(
+                'threads/' . $threadId . '/feature',
+                $options,
+                $image === null ? [] : ['image' => $image]
+            )->array('feature')
+        );
+    }
+
+    /**
+     * Remove a thread from the featured-content list. See feature() on availability.
+     */
+    public function unfeature(int $threadId): bool
+    {
+        return $this->apiPost('threads/' . $threadId . '/unfeature')->isSuccess();
     }
 
     /**

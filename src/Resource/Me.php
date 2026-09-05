@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\XenForo\Api\Resource;
 
 use Hampel\XenForo\Api\Generated\Schema\User;
+use Hampel\XenForo\Api\Upload;
 
 /**
  * Me - the user this credential is acting as.
@@ -60,6 +61,18 @@ final class Me extends Resource
             'current_password' => $currentPassword,
             'new_password' => $newPassword,
         ])->isSuccess();
+    }
+
+    /**
+     * Replace the acting user's avatar.
+     *
+     * The forum decides what it will accept from the FILENAME's extension and from the
+     * file's own contents - the upload's declared content type is not consulted. A file
+     * named without an extension is rejected however valid the image inside it is.
+     */
+    public function uploadAvatar(Upload $avatar): bool
+    {
+        return $this->apiUpload('me/avatar', [], ['avatar' => $avatar])->isSuccess();
     }
 
     public function deleteAvatar(): bool

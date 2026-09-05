@@ -8,6 +8,7 @@ use Hampel\XenForo\Api\Connection;
 use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Result\ApiResponse;
 use Hampel\XenForo\Api\Result\Page;
+use Hampel\XenForo\Api\Upload;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -81,6 +82,22 @@ abstract class Resource
     protected function apiPut(string $path, array $payload = [], array $query = []): ApiResponse
     {
         return $this->connection->put($path, $payload, $query);
+    }
+
+    /**
+     * Upload a file - an attachment, an avatar, a featured-content image.
+     *
+     * Separate from apiPost() rather than folded into it, because the difference is not
+     * only how the body is encoded: multipart works on a POST and on nothing else, for
+     * reasons upstream of XenForo. Connection::postMultipart() has the detail.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, Upload>  $files  keyed by the input name the endpoint reads
+     * @param  array<string, scalar|array<mixed>|null>  $query
+     */
+    protected function apiUpload(string $path, array $payload, array $files, array $query = []): ApiResponse
+    {
+        return $this->connection->postMultipart($path, $payload, $files, $query);
     }
 
     /**
