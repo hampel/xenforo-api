@@ -74,9 +74,9 @@ $info->hasScope('user:write');
 | `media()` `mediaAlbums()` `mediaCategories()` `mediaComments()` | XenForo Media Gallery |
 | `resourceItems()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
 
-Coverage is checked in both directions by `SpecConformanceTest`: every path a resource
-calls exists in the specification, and every endpoint the specification describes is called
-by a resource. A future spec bringing new endpoints fails that second check by name.
+Coverage is checked in both directions by `SpecConformanceTest`: every path an endpoint
+class calls exists in the specification, and every endpoint the specification describes is
+called by one. A future spec bringing new endpoints fails that second check by name.
 
 What no client can cover is what an add-on adds — see
 [Extending it](#extending-it-for-add-on-endpoints).
@@ -269,7 +269,7 @@ how the client is configured; prefer it.
 
 XFMG and XFRM are add-ons, not core, and a forum may have neither. Their endpoints are
 wrapped here as a convenience — this is the same extension mechanism described below, and
-these classes are what a third party's own `Resource` would look like.
+these classes are what a third party's own `Endpoint` would look like.
 
 | accessor | tag | what it covers |
 |---|---|---|
@@ -277,7 +277,7 @@ these classes are what a third party's own `Resource` would look like.
 | `mediaAlbums()` | Media albums | albums, their media and comments, reactions |
 | `mediaCategories()` | Media categories | the category tree, and a category's contents |
 | `mediaComments()` | Media comments | comments on either a media item or an album |
-| `resourceItems()` | Resources | resources, their versions, updates and reviews |
+| `resources()` | Resources | resources, their versions, updates and reviews |
 | `resourceCategories()` | Resource categories | the category tree, and a category's resources |
 | `resourceReviews()` | Resource reviews | reviews, and the author's reply to one |
 | `resourceUpdates()` | Resource updates | the posts announcing a change to a resource |
@@ -286,7 +286,7 @@ these classes are what a third party's own `Resource` would look like.
 ```php
 $xf->media()->create(['album_id' => 4, 'title' => 'Sunset'], Upload::fromPath('/tmp/sunset.jpg'));
 
-$xf->resourceItems()->versions($resourceId);
+$xf->resources()->versions($resourceId);
 $xf->resourceVersions()->download($versionId, $fileId)->saveTo('/tmp/release.zip');
 ```
 
@@ -294,11 +294,6 @@ $xf->resourceVersions()->download($versionId, $fileId)->saveTo('/tmp/release.zip
 answer a missing record gets — so `find()` returning `null` cannot be read as "no such
 media item" unless you already know the gallery is installed.
 `$xf->index()->get()->hasScope('media:read')` tells the two apart in one request.
-
-`resourceItems()` is the one accessor not named after its tag. `Resource` is already the
-base class of every resource here and `resource()` is already the extension point, so
-`resources()` would make one word mean two unrelated things; XenForo's own entity is
-`XFRM\Entity\ResourceItem`, and this borrows that.
 
 Two things in these add-ons are shaped unlike anything in core. `media-albums/{id}/` is the
 only endpoint in the API that paginates **two** lists at once, so its pagination blocks are
@@ -347,13 +342,13 @@ For a one-off, call it directly:
 $xf->connection()->get('users/find-criteria', ['email' => $email])->data;
 ```
 
-For anything used more than once, write a `Resource`:
+For anything used more than once, write an `Endpoint`:
 
 ```php
 use Hampel\XenForo\Api\Generated\Schema\User;
-use Hampel\XenForo\Api\Resource\Resource;
+use Hampel\XenForo\Api\Endpoint\Endpoint;
 
-final class UserFindCriteria extends Resource
+final class UserFindCriteria extends Endpoint
 {
     public function byEmail(string $email): ?User
     {
@@ -361,12 +356,12 @@ final class UserFindCriteria extends Resource
     }
 }
 
-$xf->resource(UserFindCriteria::class)->byEmail('someone@example.com');
+$xf->endpoint(UserFindCriteria::class)->byEmail('someone@example.com');
 ```
 
 There is nothing to register, no container and no string keys — the class *is* the
 registration, so a third party can ship one in its own package and a consumer's static
-analysis follows the return type all the way through. `Client::resource()` memoises by class
+analysis follows the return type all the way through. `Client::endpoint()` memoises by class
 name, and the built-in accessors like `users()` are the same mechanism with a shorter name.
 
 Subclassing buys you `apiPaginate()`, `apiEach()` and `apiFind()`, which work unchanged for
@@ -429,8 +424,8 @@ composer check
 The suite needs no network: PSR-18 is a one-method interface, so the seam the package
 exposes to its consumers is the seam the tests drive it through.
 
-`SpecConformanceTest` is the one worth knowing about. It reads the paths out of the resource
-classes and checks each against XenForo's specification, because the resources are
+`SpecConformanceTest` is the one worth knowing about. It reads the paths out of the endpoint
+classes and checks each against XenForo's specification, because they are
 hand-written and a mistyped path is a 404 at runtime that every stubbed test passes either
 way. It also checks the reverse — that nothing in the specification is unwrapped — so
 updating `resources/openapi.json` reports what XenForo has added rather than passing

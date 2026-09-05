@@ -6,37 +6,37 @@ namespace Hampel\XenForo\Api;
 
 use Hampel\XenForo\Api\Authentication\Authentication;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
+use Hampel\XenForo\Api\Endpoint\Alerts;
+use Hampel\XenForo\Api\Endpoint\Attachments;
+use Hampel\XenForo\Api\Endpoint\Auth;
+use Hampel\XenForo\Api\Endpoint\ConversationMessages;
+use Hampel\XenForo\Api\Endpoint\Conversations;
+use Hampel\XenForo\Api\Endpoint\Endpoint;
+use Hampel\XenForo\Api\Endpoint\Featured;
+use Hampel\XenForo\Api\Endpoint\Forums;
+use Hampel\XenForo\Api\Endpoint\Index;
+use Hampel\XenForo\Api\Endpoint\Me;
+use Hampel\XenForo\Api\Endpoint\Media;
+use Hampel\XenForo\Api\Endpoint\MediaAlbums;
+use Hampel\XenForo\Api\Endpoint\MediaCategories;
+use Hampel\XenForo\Api\Endpoint\MediaComments;
+use Hampel\XenForo\Api\Endpoint\Nodes;
+use Hampel\XenForo\Api\Endpoint\OAuth2;
+use Hampel\XenForo\Api\Endpoint\OEmbed;
+use Hampel\XenForo\Api\Endpoint\Posts;
+use Hampel\XenForo\Api\Endpoint\ProfilePostComments;
+use Hampel\XenForo\Api\Endpoint\ProfilePosts;
+use Hampel\XenForo\Api\Endpoint\ResourceCategories;
+use Hampel\XenForo\Api\Endpoint\ResourceReviews;
+use Hampel\XenForo\Api\Endpoint\ResourceUpdates;
+use Hampel\XenForo\Api\Endpoint\ResourceVersions;
+use Hampel\XenForo\Api\Endpoint\Resources;
+use Hampel\XenForo\Api\Endpoint\Search;
+use Hampel\XenForo\Api\Endpoint\SearchForums;
+use Hampel\XenForo\Api\Endpoint\Stats;
+use Hampel\XenForo\Api\Endpoint\Threads;
+use Hampel\XenForo\Api\Endpoint\Users;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
-use Hampel\XenForo\Api\Resource\Alerts;
-use Hampel\XenForo\Api\Resource\Attachments;
-use Hampel\XenForo\Api\Resource\Auth;
-use Hampel\XenForo\Api\Resource\ConversationMessages;
-use Hampel\XenForo\Api\Resource\Conversations;
-use Hampel\XenForo\Api\Resource\Featured;
-use Hampel\XenForo\Api\Resource\Forums;
-use Hampel\XenForo\Api\Resource\Index;
-use Hampel\XenForo\Api\Resource\Me;
-use Hampel\XenForo\Api\Resource\Media;
-use Hampel\XenForo\Api\Resource\MediaAlbums;
-use Hampel\XenForo\Api\Resource\MediaCategories;
-use Hampel\XenForo\Api\Resource\MediaComments;
-use Hampel\XenForo\Api\Resource\Nodes;
-use Hampel\XenForo\Api\Resource\OAuth2;
-use Hampel\XenForo\Api\Resource\OEmbed;
-use Hampel\XenForo\Api\Resource\Posts;
-use Hampel\XenForo\Api\Resource\ProfilePostComments;
-use Hampel\XenForo\Api\Resource\ProfilePosts;
-use Hampel\XenForo\Api\Resource\Resource;
-use Hampel\XenForo\Api\Resource\ResourceCategories;
-use Hampel\XenForo\Api\Resource\ResourceItems;
-use Hampel\XenForo\Api\Resource\ResourceReviews;
-use Hampel\XenForo\Api\Resource\ResourceUpdates;
-use Hampel\XenForo\Api\Resource\ResourceVersions;
-use Hampel\XenForo\Api\Resource\Search;
-use Hampel\XenForo\Api\Resource\SearchForums;
-use Hampel\XenForo\Api\Resource\Stats;
-use Hampel\XenForo\Api\Resource\Threads;
-use Hampel\XenForo\Api\Resource\Users;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
@@ -68,19 +68,19 @@ use Psr\Log\NullLogger;
  *
  *     $xf->connection()->get('users/find-criteria', ['email' => $email])->data;
  *
- * The one to reach for when the endpoint is used more than once is a Resource subclass,
+ * The one to reach for when the endpoint is used more than once is a Endpoint subclass,
  * which this class will construct for you:
  *
- *     $xf->resource(UserFindCriteria::class)->byEmail($email);
+ *     $xf->endpoint(UserFindCriteria::class)->byEmail($email);
  *
- * @see Resource for what a subclass gets and how to write one
+ * @see Endpoint for what a subclass gets and how to write one
  */
 final class Client
 {
     private readonly Connection $connection;
 
-    /** @var array<class-string<Resource>, Resource> */
-    private array $resources = [];
+    /** @var array<class-string<Endpoint>, Endpoint> */
+    private array $endpoints = [];
 
     public function __construct(
         private readonly Config $config,
@@ -163,100 +163,100 @@ final class Client
     }
 
     /**
-     * Any Resource subclass, constructed and memoised.
+     * Any Endpoint subclass, constructed and memoised.
      *
-     * This is the extension point. A third-party package ships a Resource subclass for the
+     * This is the extension point. A third-party package ships a Endpoint subclass for the
      * endpoints its add-on adds, a consumer names the class, and static analysis follows
      * the return type through - there is nothing to register, no container and no string
      * keys. The named accessors below are the same mechanism with a shorter name.
      *
-     * @template T of Resource
+     * @template T of Endpoint
      * @param  class-string<T>  $class
      * @return T
      */
-    public function resource(string $class): Resource
+    public function endpoint(string $class): Endpoint
     {
-        if (!isset($this->resources[$class])) {
+        if (!isset($this->endpoints[$class])) {
             // Both halves earn their place. The first catches a class that is not a
-            // Resource at all, which static analysis already rejects but a caller without
-            // it can still write. The second catches Resource itself and any abstract
-            // subclass - both of which satisfy class-string<Resource>, so nothing but this
+            // Endpoint at all, which static analysis already rejects but a caller without
+            // it can still write. The second catches Endpoint itself and any abstract
+            // subclass - both of which satisfy class-string<Endpoint>, so nothing but this
             // stands between them and a fatal error on `new`.
-            if (!is_subclass_of($class, Resource::class) || !(new \ReflectionClass($class))->isInstantiable()) {
+            if (!is_subclass_of($class, Endpoint::class) || !(new \ReflectionClass($class))->isInstantiable()) {
                 throw new InvalidArgumentException(sprintf(
                     '%s cannot be constructed as an API resource: it must be a concrete subclass of %s.',
                     $class,
-                    Resource::class
+                    Endpoint::class
                 ));
             }
 
-            $this->resources[$class] = new $class($this->connection, $this->logger);
+            $this->endpoints[$class] = new $class($this->connection, $this->logger);
         }
 
-        /** @var T $resource */
-        $resource = $this->resources[$class];
+        /** @var T $endpoint */
+        $endpoint = $this->endpoints[$class];
 
-        return $resource;
+        return $endpoint;
     }
 
     public function index(): Index
     {
-        return $this->resource(Index::class);
+        return $this->endpoint(Index::class);
     }
 
     public function auth(): Auth
     {
-        return $this->resource(Auth::class);
+        return $this->endpoint(Auth::class);
     }
 
     public function me(): Me
     {
-        return $this->resource(Me::class);
+        return $this->endpoint(Me::class);
     }
 
     public function users(): Users
     {
-        return $this->resource(Users::class);
+        return $this->endpoint(Users::class);
     }
 
     public function threads(): Threads
     {
-        return $this->resource(Threads::class);
+        return $this->endpoint(Threads::class);
     }
 
     public function posts(): Posts
     {
-        return $this->resource(Posts::class);
+        return $this->endpoint(Posts::class);
     }
 
     public function forums(): Forums
     {
-        return $this->resource(Forums::class);
+        return $this->endpoint(Forums::class);
     }
 
     public function nodes(): Nodes
     {
-        return $this->resource(Nodes::class);
+        return $this->endpoint(Nodes::class);
     }
 
     public function conversations(): Conversations
     {
-        return $this->resource(Conversations::class);
+        return $this->endpoint(Conversations::class);
     }
 
     public function conversationMessages(): ConversationMessages
     {
-        return $this->resource(ConversationMessages::class);
+        return $this->endpoint(ConversationMessages::class);
     }
 
     public function alerts(): Alerts
     {
-        return $this->resource(Alerts::class);
+        return $this->endpoint(Alerts::class);
     }
 
     public function attachments(): Attachments
     {
-        return $this->resource(Attachments::class);
+        return $this->endpoint(Attachments::class);
     }
 
     /**
@@ -267,42 +267,42 @@ final class Client
      */
     public function oauth2(): OAuth2
     {
-        return $this->resource(OAuth2::class);
+        return $this->endpoint(OAuth2::class);
     }
 
     public function profilePosts(): ProfilePosts
     {
-        return $this->resource(ProfilePosts::class);
+        return $this->endpoint(ProfilePosts::class);
     }
 
     public function profilePostComments(): ProfilePostComments
     {
-        return $this->resource(ProfilePostComments::class);
+        return $this->endpoint(ProfilePostComments::class);
     }
 
     public function search(): Search
     {
-        return $this->resource(Search::class);
+        return $this->endpoint(Search::class);
     }
 
     public function searchForums(): SearchForums
     {
-        return $this->resource(SearchForums::class);
+        return $this->endpoint(SearchForums::class);
     }
 
     public function featured(): Featured
     {
-        return $this->resource(Featured::class);
+        return $this->endpoint(Featured::class);
     }
 
     public function stats(): Stats
     {
-        return $this->resource(Stats::class);
+        return $this->endpoint(Stats::class);
     }
 
     public function oembed(): OEmbed
     {
-        return $this->resource(OEmbed::class);
+        return $this->endpoint(OEmbed::class);
     }
 
     /**
@@ -312,58 +312,54 @@ final class Client
      * accessors answers 404 on a forum without them - see the resource classes. They are
      * wrapped here as a convenience, not as a promise: this is the same extension mechanism
      * described on Client::resource(), and these classes are what a third party's own
-     * Resource subclass would look like.
+     * Endpoint subclass would look like.
      */
     public function media(): Media
     {
-        return $this->resource(Media::class);
+        return $this->endpoint(Media::class);
     }
 
     public function mediaAlbums(): MediaAlbums
     {
-        return $this->resource(MediaAlbums::class);
+        return $this->endpoint(MediaAlbums::class);
     }
 
     public function mediaCategories(): MediaCategories
     {
-        return $this->resource(MediaCategories::class);
+        return $this->endpoint(MediaCategories::class);
     }
 
     public function mediaComments(): MediaComments
     {
-        return $this->resource(MediaComments::class);
+        return $this->endpoint(MediaComments::class);
     }
 
     /**
      * XenForo Resource Manager's resources, if the forum has it.
-     *
-     * Named resourceItems() rather than resources() deliberately: `resource()` above is
-     * this package's extension point, and the two would read as the same thing. See the
-     * ResourceItems class.
      */
-    public function resourceItems(): ResourceItems
+    public function resources(): Resources
     {
-        return $this->resource(ResourceItems::class);
+        return $this->endpoint(Resources::class);
     }
 
     public function resourceCategories(): ResourceCategories
     {
-        return $this->resource(ResourceCategories::class);
+        return $this->endpoint(ResourceCategories::class);
     }
 
     public function resourceReviews(): ResourceReviews
     {
-        return $this->resource(ResourceReviews::class);
+        return $this->endpoint(ResourceReviews::class);
     }
 
     public function resourceUpdates(): ResourceUpdates
     {
-        return $this->resource(ResourceUpdates::class);
+        return $this->endpoint(ResourceUpdates::class);
     }
 
     public function resourceVersions(): ResourceVersions
     {
-        return $this->resource(ResourceVersions::class);
+        return $this->endpoint(ResourceVersions::class);
     }
 
     /**

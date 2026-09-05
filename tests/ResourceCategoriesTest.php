@@ -37,7 +37,7 @@ final class ResourceCategoriesTest extends TestCase
 
     /**
      * A category decides which resource types may be created in it, so a create refused by
-     * ResourceItems is often this rather than a permission.
+     * Resources is often this rather than a permission.
      */
     public function test_it_creates_a_category_with_its_type_permissions(): void
     {

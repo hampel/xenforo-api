@@ -6,36 +6,36 @@ namespace Hampel\XenForo\Api\Tests;
 
 use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
+use Hampel\XenForo\Api\Endpoint\Alerts;
+use Hampel\XenForo\Api\Endpoint\Attachments;
+use Hampel\XenForo\Api\Endpoint\Auth;
+use Hampel\XenForo\Api\Endpoint\ConversationMessages;
+use Hampel\XenForo\Api\Endpoint\Conversations;
+use Hampel\XenForo\Api\Endpoint\Featured;
+use Hampel\XenForo\Api\Endpoint\Forums;
+use Hampel\XenForo\Api\Endpoint\Index;
+use Hampel\XenForo\Api\Endpoint\Me;
+use Hampel\XenForo\Api\Endpoint\Media;
+use Hampel\XenForo\Api\Endpoint\MediaAlbums;
+use Hampel\XenForo\Api\Endpoint\MediaCategories;
+use Hampel\XenForo\Api\Endpoint\MediaComments;
+use Hampel\XenForo\Api\Endpoint\Nodes;
+use Hampel\XenForo\Api\Endpoint\OAuth2;
+use Hampel\XenForo\Api\Endpoint\OEmbed;
+use Hampel\XenForo\Api\Endpoint\Posts;
+use Hampel\XenForo\Api\Endpoint\ProfilePostComments;
+use Hampel\XenForo\Api\Endpoint\ProfilePosts;
+use Hampel\XenForo\Api\Endpoint\ResourceCategories;
+use Hampel\XenForo\Api\Endpoint\ResourceReviews;
+use Hampel\XenForo\Api\Endpoint\ResourceUpdates;
+use Hampel\XenForo\Api\Endpoint\ResourceVersions;
+use Hampel\XenForo\Api\Endpoint\Resources;
+use Hampel\XenForo\Api\Endpoint\Search;
+use Hampel\XenForo\Api\Endpoint\SearchForums;
+use Hampel\XenForo\Api\Endpoint\Stats;
+use Hampel\XenForo\Api\Endpoint\Threads;
+use Hampel\XenForo\Api\Endpoint\Users;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
-use Hampel\XenForo\Api\Resource\Alerts;
-use Hampel\XenForo\Api\Resource\Attachments;
-use Hampel\XenForo\Api\Resource\Auth;
-use Hampel\XenForo\Api\Resource\ConversationMessages;
-use Hampel\XenForo\Api\Resource\Conversations;
-use Hampel\XenForo\Api\Resource\Featured;
-use Hampel\XenForo\Api\Resource\Forums;
-use Hampel\XenForo\Api\Resource\Index;
-use Hampel\XenForo\Api\Resource\Me;
-use Hampel\XenForo\Api\Resource\Media;
-use Hampel\XenForo\Api\Resource\MediaAlbums;
-use Hampel\XenForo\Api\Resource\MediaCategories;
-use Hampel\XenForo\Api\Resource\MediaComments;
-use Hampel\XenForo\Api\Resource\Nodes;
-use Hampel\XenForo\Api\Resource\OAuth2;
-use Hampel\XenForo\Api\Resource\OEmbed;
-use Hampel\XenForo\Api\Resource\Posts;
-use Hampel\XenForo\Api\Resource\ProfilePostComments;
-use Hampel\XenForo\Api\Resource\ProfilePosts;
-use Hampel\XenForo\Api\Resource\ResourceCategories;
-use Hampel\XenForo\Api\Resource\ResourceItems;
-use Hampel\XenForo\Api\Resource\ResourceReviews;
-use Hampel\XenForo\Api\Resource\ResourceUpdates;
-use Hampel\XenForo\Api\Resource\ResourceVersions;
-use Hampel\XenForo\Api\Resource\Search;
-use Hampel\XenForo\Api\Resource\SearchForums;
-use Hampel\XenForo\Api\Resource\Stats;
-use Hampel\XenForo\Api\Resource\Threads;
-use Hampel\XenForo\Api\Resource\Users;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ClientTest extends TestCase
@@ -82,19 +82,19 @@ final class ClientTest extends TestCase
      * shorthand, not a second mechanism - so a mistyped one would be found here rather than
      * at runtime against a forum.
      *
-     * @param  class-string<\Hampel\XenForo\Api\Resource\Resource>  $class
+     * @param  class-string<\Hampel\XenForo\Api\Endpoint\Endpoint>  $class
      */
     #[DataProvider('accessors')]
-    public function test_a_named_accessor_is_resource_with_the_class(string $accessor, string $class): void
+    public function test_a_named_accessor_is_endpoint_with_the_class(string $accessor, string $class): void
     {
         $xf = $this->xenforo();
 
         $this->assertInstanceOf($class, $xf->{$accessor}());
-        $this->assertSame($xf->resource($class), $xf->{$accessor}());
+        $this->assertSame($xf->endpoint($class), $xf->{$accessor}());
     }
 
     /**
-     * @return iterable<string, array{string, class-string<\Hampel\XenForo\Api\Resource\Resource>}>
+     * @return iterable<string, array{string, class-string<\Hampel\XenForo\Api\Endpoint\Endpoint>}>
      */
     public static function accessors(): iterable
     {
@@ -123,7 +123,7 @@ final class ClientTest extends TestCase
             'mediaAlbums' => MediaAlbums::class,
             'mediaCategories' => MediaCategories::class,
             'mediaComments' => MediaComments::class,
-            'resourceItems' => ResourceItems::class,
+            'resources' => Resources::class,
             'resourceCategories' => ResourceCategories::class,
             'resourceReviews' => ResourceReviews::class,
             'resourceUpdates' => ResourceUpdates::class,

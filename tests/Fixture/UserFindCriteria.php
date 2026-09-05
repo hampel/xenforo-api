@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Tests\Fixture;
 
+use Hampel\XenForo\Api\Endpoint\Endpoint;
 use Hampel\XenForo\Api\Generated\Schema\User;
-use Hampel\XenForo\Api\Resource\Resource;
 
 /**
- * A resource for an endpoint this package knows nothing about.
+ * An endpoint class for a route this package knows nothing about.
  *
  * Modelled on the real Hampel/UserFindCriteria add-on, which extends
  * \XF\Api\Controller\UsersController with an actionGetFindCriteria() and so adds
@@ -20,7 +20,7 @@ use Hampel\XenForo\Api\Resource\Resource;
  * paginated - apiPaginate() and apiEach(), because every list endpoint in XenForo returns
  * the same pagination block whoever wrote it.
  */
-final class UserFindCriteria extends Resource
+final class UserFindCriteria extends Endpoint
 {
     public function byEmail(string $email): ?User
     {

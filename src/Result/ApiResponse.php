@@ -8,7 +8,7 @@ namespace Hampel\XenForo\Api\Result;
  * A successful API response: the decoded body, and the metadata that came with it.
  *
  * Returned rather than a bare array so the version headers are reachable without the
- * client having to remember the last response in a mutable field. Resource classes read
+ * client having to remember the last response in a mutable field. Endpoint classes read
  * `->data` and mostly ignore the rest; an integration that cares whether the forum has
  * outgrown it reads `->meta`.
  */

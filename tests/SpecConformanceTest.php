@@ -135,7 +135,7 @@ final class SpecConformanceTest extends BaseTestCase
     }
 
     /**
-     * Every API call in src/Resource, as [file, method, path].
+     * Every API call in src/Endpoint, as [file, method, path].
      *
      * Read statically out of the source: a path built as `'users/' . $userId . '/'` becomes
      * `/users/{id}/`, which is the form the specification uses.
@@ -168,10 +168,10 @@ final class SpecConformanceTest extends BaseTestCase
 
         $calls = [];
 
-        foreach (glob(dirname(__DIR__) . '/src/Resource/*.php') ?: [] as $file) {
+        foreach (glob(dirname(__DIR__) . '/src/Endpoint/*.php') ?: [] as $file) {
             $name = basename($file);
 
-            if ($name === 'Resource.php') {
+            if ($name === 'Endpoint.php') {
                 continue; // the base class, whose paths are its callers'
             }
 

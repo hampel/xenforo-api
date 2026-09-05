@@ -18,11 +18,11 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 
 | path | what it is |
 |---|---|
-| `src/Client.php` | the entry point; named accessors and `resource()` |
+| `src/Client.php` | the entry point; named accessors and `endpoint()` |
 | `src/Connection.php` | everything that touches HTTP |
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
-| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - every endpoint in the pinned specification |
-| `src/Resource/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
+| `src/Endpoint/` | hand-written endpoint groups, and the `Endpoint` base class - every endpoint in the pinned specification |
+| `src/Endpoint/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
 | `src/Result/` | what an endpoint answers with, where that is not an entity |
 | `src/Exception/` | the hierarchy, from `XenForoException` down |
@@ -53,10 +53,6 @@ indistinguishable from a missing record. They are in the package because they ar
 by XenForo and widely installed, not because the package promises to wrap add-ons - the
 mechanism below is what does that.
 
-`ResourceItems` is the one class not named after its API tag. `Resource` is the base class
-of every resource here and `resource()` is the extension point, so a `Resources` beside them
-would make one word mean two things; XenForo's own entity is `XFRM\Entity\ResourceItem`.
-
 Two shapes there exist nowhere else in the API, and both are noted where they live:
 `media-albums/{id}/` paginates two lists at once (`media_pagination`,
 `comment_pagination`, which is why `Page::fromResponse()` takes a pagination key), and a
@@ -70,10 +66,10 @@ list of what any given forum offers. Two ways past it, neither needing a release
 
 ```php
 $xf->connection()->get('users/find-criteria', ['email' => $email])->data;   // once
-$xf->resource(UserFindCriteria::class)->byEmail($email);                    // more than once
+$xf->endpoint(UserFindCriteria::class)->byEmail($email);                    // more than once
 ```
 
-The second is the one to build on. A `Resource` subclass gets the pagination helpers, which
+The second is the one to build on. An `Endpoint` subclass gets the pagination helpers, which
 work for an endpoint this package has never heard of, because every list endpoint in XenForo
 builds its pagination block with the same `AbstractController::getPaginationData()`.
 

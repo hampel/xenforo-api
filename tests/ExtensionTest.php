@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Tests;
 
+use Hampel\XenForo\Api\Endpoint\Endpoint;
+use Hampel\XenForo\Api\Endpoint\Users;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
-use Hampel\XenForo\Api\Resource\Resource;
-use Hampel\XenForo\Api\Resource\Users;
 use Hampel\XenForo\Api\Tests\Fixture\UserFindCriteria;
 
 /**
@@ -18,7 +18,7 @@ final class ExtensionTest extends TestCase
     {
         $this->client->pushJson(200, ['user' => ['user_id' => 4264, 'username' => 'sim']]);
 
-        $user = $this->xenforo()->resource(UserFindCriteria::class)->byEmail('sim@example.com');
+        $user = $this->xenforo()->endpoint(UserFindCriteria::class)->byEmail('sim@example.com');
 
         $this->assertNotNull($user);
         $this->assertSame(4264, $user->user_id);
@@ -32,8 +32,8 @@ final class ExtensionTest extends TestCase
     {
         $xf = $this->xenforo();
 
-        $this->assertSame($xf->resource(UserFindCriteria::class), $xf->resource(UserFindCriteria::class));
-        $this->assertSame($xf->users(), $xf->resource(Users::class));
+        $this->assertSame($xf->endpoint(UserFindCriteria::class), $xf->endpoint(UserFindCriteria::class));
+        $this->assertSame($xf->users(), $xf->endpoint(Users::class));
     }
 
     /**
@@ -45,7 +45,7 @@ final class ExtensionTest extends TestCase
     {
         $this->client->pushError(404, [['code' => 'requested_page_not_found']]);
 
-        $this->assertNull($this->xenforo()->resource(UserFindCriteria::class)->byUsername('nobody'));
+        $this->assertNull($this->xenforo()->endpoint(UserFindCriteria::class)->byUsername('nobody'));
     }
 
     public function test_an_extension_can_return_data_no_core_endpoint_produces(): void
@@ -59,7 +59,7 @@ final class ExtensionTest extends TestCase
             ],
         ]);
 
-        $urls = $this->xenforo()->resource(UserFindCriteria::class)->urlsFor('sim@example.com');
+        $urls = $this->xenforo()->endpoint(UserFindCriteria::class)->urlsFor('sim@example.com');
 
         $this->assertSame('https://forum.example.com/members/sim.1/', $urls['public']);
     }
@@ -77,7 +77,7 @@ final class ExtensionTest extends TestCase
     }
 
     /**
-     * The base class satisfies class-string<Resource> and is abstract, so this is the one
+     * The base class satisfies class-string<Endpoint> and is abstract, so this is the one
      * way to reach the guard that static analysis does not already prevent - and it is a
      * mistake somebody will actually make, unlike passing an unrelated class.
      */
@@ -86,6 +86,6 @@ final class ExtensionTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('must be a concrete subclass');
 
-        $this->xenforo()->resource(Resource::class);
+        $this->xenforo()->endpoint(Endpoint::class);
     }
 }

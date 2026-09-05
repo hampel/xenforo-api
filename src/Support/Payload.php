@@ -90,7 +90,7 @@ final class Payload
             } elseif ($value instanceof Upload) {
                 throw new InvalidArgumentException(sprintf(
                     'Cannot send a file as the value of "%s" in a form-encoded body: a file goes in the $files '
-                        . 'argument of Connection::postMultipart() or Resource::apiUpload().',
+                        . 'argument of Connection::postMultipart() or Endpoint::apiUpload().',
                     (string) $key
                 ));
             } else {
