@@ -58,6 +58,17 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
+          # Both tools are themselves dev dependencies, which the install below deletes,
+          # so neither can come from the package. setup-php puts them on PATH outside
+          # every vendor tree - which for PHPStan is load-bearing rather than tidy: run
+          # from inside some other package's vendor/, it picks up the autoloader beside
+          # it and lends this package that package's dependencies, so the check passes on
+          # exactly the class it exists to catch.
+          tools: phpstan, composer-require-checker
+
+      # One install, dev-free, serving both checks - which is also the closure a consumer
+      # actually gets.
+      - run: composer install --no-dev --prefer-dist --no-progress
 
       # Two checks here, and they catch different things.
       #
@@ -70,34 +81,20 @@ jobs:
       # half that sees a missing ext-*, which is invisible to static analysis because a
       # function from an absent extension looks exactly like one from core. That is not
       # hypothetical here: ctype_digit() in src/ went undeclared until this check named it.
-      - run: composer install --prefer-dist --no-progress
+      - run: composer-require-checker check composer.json
 
-      # Same shape as the phpstan step below, and the same trap: composer -d does not
-      # create the directory.
-      - run: |
-          mkdir -p /tmp/crc
-          composer -d /tmp/crc require maglnet/composer-require-checker --no-progress
-          /tmp/crc/vendor/bin/composer-require-checker check composer.json
-
-      # Now analyse src/ with the dev dependencies gone, so anything it calls that is not in
-      # "require" comes back as not-found. A normal PHPStan run has guzzle and phpunit
-      # installed and sees nothing wrong, and the package would fatal for the consumer
-      # instead. It matters here more than most - the whole point of this package is that it
-      # needs four PSR interfaces and nothing else.
-      - run: composer install --no-dev --prefer-dist --no-progress
-
-      # PHPStan is itself a dev dependency, so --no-dev just deleted it. It has to come
-      # from outside the package. composer -d does not create the directory, so mkdir
-      # first or the step dies with "Invalid working directory specified".
-      - run: |
-          mkdir -p /tmp/phpstan
-          composer -d /tmp/phpstan require phpstan/phpstan --no-progress
-
+      # PHPStan over src/ with the dev dependencies gone, so anything it calls that is not
+      # in "require" comes back as not-found. A normal run has guzzle and phpunit installed
+      # and sees nothing wrong, and the package would fatal for the consumer instead. It
+      # matters here more than most - the whole point of this package is that it needs four
+      # PSR interfaces and nothing else. It sees only the direct case, never the transitive
+      # one above, so it supplements that check rather than replacing it.
+      #
       # -c is not optional. Without it PHPStan discovers the package's own phpstan.neon,
       # which points at tests/ and can no longer resolve PHPUnit - turning the run into a
       # configuration error while you are trying to read it as a dependency result.
       - run: >
-          /tmp/phpstan/vendor/bin/phpstan analyse
+          phpstan analyse
           -c .github/phpstan-nodev.neon
           --autoload-file=vendor/autoload.php --no-progress
 
