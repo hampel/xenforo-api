@@ -10,8 +10,10 @@ use Psr\Http\Message\RequestInterface;
  * How this client proves who it is.
  *
  * XenForo accepts three quite different credentials on the same endpoints - a key in the
- * XF-Api-Key header, an OAuth2 bearer token, and HTTP Basic for a client's own credentials
- * at the token endpoint - and which one you hold changes what you may ask for. Modelling
+ * XF-Api-Key header, an OAuth2 bearer token, and HTTP Basic for an OAuth2 client's own id
+ * and secret, which identifies the client and resolves to a guest - and which one you hold
+ * changes what you may ask for. (The token endpoints themselves want none of them; see
+ * ClientCredentials.) Modelling
  * that as an interface rather than a `string $apiKey` constructor argument is what keeps
  * "act as this user" and "bypass permissions" from becoming magic strings passed alongside
  * every call: they belong to a super-user key and to nothing else.

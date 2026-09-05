@@ -57,7 +57,7 @@ $info->hasScope('user:write');
 
 ## What is wrapped
 
-153 of the API's 162 endpoints, through these accessors:
+157 of the API's 162 endpoints, through these accessors:
 
 | | |
 |---|---|
@@ -69,11 +69,11 @@ $info->hasScope('user:write');
 | `conversations()` `conversationMessages()` | private conversations |
 | `attachments()` | uploads, downloads, and the keys they go against |
 | `search()` | search, and re-reading a previous result |
+| `oauth2()` | the token endpoints: exchange, refresh, introspect, revoke |
 | `media()` `mediaAlbums()` `mediaCategories()` `mediaComments()` | XenForo Media Gallery |
 | `resourceItems()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
 
-Not wrapped: the OAuth2 token endpoints — the credentials themselves are, see
-[Authenticating](#authenticating) — oEmbed, stats, featured content, and search forums.
+Not wrapped: oEmbed, stats, featured content, and the two search-forum endpoints.
 All of them are one `connection()->get()` or `->post()` away, and a `Resource` subclass is
 how to make that permanent — see [Extending it](#extending-it-for-add-on-endpoints).
 
@@ -103,6 +103,58 @@ foreach ($userIds as $userId) {
     $xf->actingAs($userId)->me()->update(['timezone' => 'Australia/Sydney']);
 }
 ```
+
+## OAuth2
+
+The token endpoints need **no credential of their own** — XenForo declares them
+`allowUnauthenticatedRequest()`, and a client identifies itself with `client_id` and
+`client_secret` in the request body — so a `Guest` client runs the whole flow, which is just
+as well, because a process exchanging a code has no key yet:
+
+```php
+$xf = new Client(new Config($boardUrl), new Guest(), $http, $factory, $factory);
+
+$token = $xf->oauth2()->exchangeCode($clientId, $code, $redirectUri, $clientSecret);
+
+$asUser = $xf->withCredential($token->credential());   // same forum, now as the user
+$asUser->me()->get();
+```
+
+The `code` does not come from the API. The user is sent to the forum's own
+`<board url>/oauth2/authorize?…` page, approves there, and is redirected back with it —
+that half is the user's consent and nothing in the API can stand in for it.
+
+A **public** client (mobile, single-page — anything that cannot keep a secret) sends no
+`client_secret` and proves itself with PKCE instead:
+
+```php
+$xf->oauth2()->exchangeCode($clientId, $code, $redirectUri, codeVerifier: $verifier);
+```
+
+Three behaviours are worth knowing before you build against them:
+
+- **A refresh replaces both tokens.** XenForo issues a new access token *and* a new refresh
+  token, revoking the old access token as it goes. Store both halves of what comes back —
+  reusing the refresh token you passed in fails with `invalid_grant`, which reads like an
+  expiry and is not one.
+- **An invalid token introspects as `active: false`, not as an error.** Expired, revoked,
+  never issued, issued to another client: all of them are an ordinary 200 (RFC 7662, so
+  that probing tells an attacker nothing). Read `->active`; nothing raises.
+- **Revocation succeeds whether or not the token existed.** `true` means it is gone, not
+  that it was there.
+
+```php
+$info = $xf->oauth2()->introspect($clientId, $clientSecret, $token);
+
+$info->active;              // the only field guaranteed to be there
+$info->hasScope('user:write');
+$info->expiresAt;           // RFC 7662 calls this exp; also issuedAt, userId, issuer
+```
+
+`tokenInfo()` wraps the older `GET oauth2/token`, which XenForo has deprecated in favour of
+introspection. It differs in both directions — it 404s for a token it does not know, and its
+`expires_in` is the *remaining* lifetime where the same field on a fresh token is the whole
+one — and it puts the client secret in the query string. Prefer `introspect()`.
 
 ## Pagination
 

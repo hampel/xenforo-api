@@ -10,9 +10,17 @@ use Psr\Http\Message\RequestInterface;
 /**
  * An OAuth2 client's own id and secret, as HTTP Basic.
  *
- * This authenticates the client, not a user: XenForo resolves it to the guest user and it
- * exists for the token endpoints. Presenting it to an ordinary endpoint gets you guest
- * permissions rather than an error, which is the confusing part worth knowing.
+ * This authenticates the CLIENT, not a user. \XF\Api\App::validateUserFromApiHeader()
+ * looks the pair up, and on finding an active client resolves the request to the GUEST
+ * user - so it gets you past "no API key was presented" and no further. Presenting it to an
+ * ordinary endpoint is not an error; it simply answers as it would to any guest, which
+ * is the confusing part worth knowing.
+ *
+ * NOT WHAT THE TOKEN ENDPOINTS WANT. `oauth2/token`, `introspect` and `revoke` need no
+ * credential at all - they are allowUnauthenticatedRequest() - and they read `client_id`
+ * and `client_secret` from the request's own input rather than from this header. So the
+ * OAuth2 resource passes them as arguments and this class has nothing to do with the flow.
+ * A client built with Guest runs it just as well.
  */
 final class ClientCredentials implements Authentication
 {

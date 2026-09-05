@@ -20,6 +20,7 @@ use Hampel\XenForo\Api\Resource\MediaAlbums;
 use Hampel\XenForo\Api\Resource\MediaCategories;
 use Hampel\XenForo\Api\Resource\MediaComments;
 use Hampel\XenForo\Api\Resource\Nodes;
+use Hampel\XenForo\Api\Resource\OAuth2;
 use Hampel\XenForo\Api\Resource\Posts;
 use Hampel\XenForo\Api\Resource\ProfilePostComments;
 use Hampel\XenForo\Api\Resource\ProfilePosts;
@@ -133,6 +134,31 @@ final class Client
     }
 
     /**
+     * The same forum and transport, under a different credential.
+     *
+     * What the OAuth2 flow ends with: the client that exchanged the code holds no key of
+     * its own, and the token it now has belongs to a user rather than to the integration.
+     *
+     *     $token = $xf->oauth2()->exchangeCode($clientId, $code, $redirectUri, $secret);
+     *     $asUser = $xf->withCredential($token->credential());
+     *
+     * A new client rather than a mutation, for the reason actingAs() gives: two credentials
+     * in one long-running process must not be able to leak into each other's requests.
+     * Resources are not carried over - they hold the connection this one is replacing.
+     */
+    public function withCredential(Authentication $authentication): self
+    {
+        return new self(
+            $this->config,
+            $authentication,
+            $this->connection->client(),
+            $this->connection->requestFactory(),
+            $this->connection->streamFactory(),
+            $this->logger
+        );
+    }
+
+    /**
      * Any Resource subclass, constructed and memoised.
      *
      * This is the extension point. A third-party package ships a Resource subclass for the
@@ -227,6 +253,17 @@ final class Client
     public function attachments(): Attachments
     {
         return $this->resource(Attachments::class);
+    }
+
+    /**
+     * The OAuth2 token endpoints - exchanging a code, refreshing, introspecting, revoking.
+     *
+     * These need no credential of their own, so this is reachable from a client built with
+     * a Guest, which is how an integration that has no key yet gets its first token.
+     */
+    public function oauth2(): OAuth2
+    {
+        return $this->resource(OAuth2::class);
     }
 
     public function profilePosts(): ProfilePosts

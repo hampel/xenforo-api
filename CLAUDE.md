@@ -21,7 +21,7 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Client.php` | the entry point; named accessors and `resource()` |
 | `src/Connection.php` | everything that touches HTTP |
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
-| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - 153 of the API's 162 endpoints |
+| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - 157 of the API's 162 endpoints |
 | `src/Resource/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
 | `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo`, `Download` |
@@ -108,6 +108,14 @@ something should say so.
   those bodies itself in `convertCustomMethodPhpInput()` and a `; charset=utf-8` makes the
   comparison fail, discarding the body with no error. Core XenForo never meets this; an
   add-on endpoint can, which is why `Connection` writes the header itself.
+- **The OAuth2 token endpoints take no credential.** `OAuth2Controller` declares
+  `allowUnauthenticatedRequest()`, and reads `client_id`/`client_secret` from the request's
+  own input - not from the HTTP Basic header `ClientCredentials` sends. That header is read
+  elsewhere, by `App::validateUserFromApiHeader()`, and resolves to a guest.
+- **A refresh replaces both tokens** and revokes the old access token, so the refresh token
+  that comes back is not the one that went in.
+- **Introspection answers `active: false` rather than erroring**, and revocation answers
+  success whether or not the token existed. Neither raises; both are RFC 7662 by design.
 - **A missing API key is not a 401.** `\XF\Api\App::validateRequest()` sets `apiKeyOmitted`
   and carries on as a guest, so unauthenticated endpoints answer normally and everything
   else answers 400 `no_api_key_in_request`.

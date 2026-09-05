@@ -20,6 +20,7 @@ use Hampel\XenForo\Api\Resource\MediaAlbums;
 use Hampel\XenForo\Api\Resource\MediaCategories;
 use Hampel\XenForo\Api\Resource\MediaComments;
 use Hampel\XenForo\Api\Resource\Nodes;
+use Hampel\XenForo\Api\Resource\OAuth2;
 use Hampel\XenForo\Api\Resource\Posts;
 use Hampel\XenForo\Api\Resource\ProfilePostComments;
 use Hampel\XenForo\Api\Resource\ProfilePosts;
@@ -105,6 +106,7 @@ final class ClientTest extends TestCase
             'conversations' => Conversations::class,
             'conversationMessages' => ConversationMessages::class,
             'alerts' => Alerts::class,
+            'oauth2' => OAuth2::class,
             'profilePosts' => ProfilePosts::class,
             'profilePostComments' => ProfilePostComments::class,
             'search' => Search::class,

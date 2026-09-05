@@ -16,11 +16,13 @@ Initial development. Nothing is released, so nothing here is a change from anyth
   `tools/generate-schemas.php`, pinned to `resources/openapi.json` taken from
   https://github.com/xenforo-ltd/docs `static/api/openapi.json` on 2026-09-05
 * `SpecConformanceTest` checks every endpoint the resources call against that specification -
-  153 of the API's 162 endpoints are wrapped
+  157 of the API's 162 endpoints are wrapped
 * file uploads: `Upload`, `Multipart` and `Connection::postMultipart()`, covering the five
   core endpoints that take a file - `attachments/`, `attachments/new-key`, `me/avatar`,
   `users/{id}/avatar` and `threads/{id}/feature` - plus `threads/{id}/unfeature`
 * `Support\Payload`, so a multipart body and a form-encoded one cannot name a field differently
+* OAuth2: an `OAuth2` resource for the four token endpoints, `Result\AccessToken` and
+  `Result\TokenIntrospection`, and `Client::withCredential()` to carry a token into a client
 * file downloads: `Connection::sendRaw()`, `Result\Download` and the three attachment
   endpoints that do not answer in JSON - `attachments/{id}/data`, `.../thumbnail` and
   `.../retina-thumbnail`
