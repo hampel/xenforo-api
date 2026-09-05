@@ -22,4 +22,9 @@ Initial development. Nothing is released, so nothing here is a change from anyth
 * file downloads: `Connection::sendRaw()`, `Result\Download` and the three attachment
   endpoints that do not answer in JSON - `attachments/{id}/data`, `.../thumbnail` and
   `.../retina-thumbnail`
+* XenForo Media Gallery and Resource Manager: `media`, `mediaAlbums`, `mediaCategories`,
+  `mediaComments`, `resourceItems`, `resourceCategories`, `resourceReviews`,
+  `resourceUpdates` and `resourceVersions` - all 62 endpoints of the nine XFMG/XFRM tags
+* `Page::fromResponse()` takes a pagination key, for `media-albums/{id}/` - the one endpoint
+  in the API that paginates two lists at once
 * harness exercises: `index`, `read`, `pagination`, `encoding` and `upload`

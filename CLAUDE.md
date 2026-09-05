@@ -22,6 +22,7 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Connection.php` | everything that touches HTTP |
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
 | `src/Resource/` | hand-written endpoint groups, and the `Resource` base class |
+| `src/Resource/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
 | `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo`, `Download` |
 | `src/Upload.php`, `src/Multipart.php` | files going out, and the `multipart/form-data` body that carries them |
@@ -42,6 +43,24 @@ opposite - what makes the client pleasant is deciding that a thread's posts are
 (`static/api/openapi.json`). That is XenForo's documentation repository, not a versioned
 artefact of the product, so the copy here is pinned deliberately: regenerating means
 updating that file first and recording in the changelog which commit it came from.
+
+## XFMG and XFRM
+
+The Media Gallery and Resource Manager resources are wrapped, and they are add-ons rather
+than core: a forum without them answers 404 for every one of those paths, which is
+indistinguishable from a missing record. They are in the package because they are bundled
+by XenForo and widely installed, not because the package promises to wrap add-ons - the
+mechanism below is what does that.
+
+`ResourceItems` is the one class not named after its API tag. `Resource` is the base class
+of every resource here and `resource()` is the extension point, so a `Resources` beside them
+would make one word mean two things; XenForo's own entity is `XFRM\Entity\ResourceItem`.
+
+Two shapes there exist nowhere else in the API, and both are noted where they live:
+`media-albums/{id}/` paginates two lists at once (`media_pagination`,
+`comment_pagination`, which is why `Page::fromResponse()` takes a pagination key), and a
+resource version with a `download_url` is hosted off-site and answers a download with a
+redirect.
 
 ## Extending it
 

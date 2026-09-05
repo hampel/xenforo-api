@@ -153,9 +153,8 @@ Two things follow from multipart that are worth knowing:
 - **`POST threads/{id}/feature` takes a multipart body whether or not you give it an
   image**, because the encoding is a property of the endpoint rather than of the call.
 
-Not wrapped yet: XenForo Media Gallery's `POST media/` and the two add-on `feature`
-endpoints, which need XFMG and XFRM resources this package does not have. Both are reachable
-through `connection()->postMultipart()`.
+All eight of the API's multipart endpoints are wrapped: attachments, both avatars, and the
+`feature` endpoints on threads, media and resources.
 
 ## Downloading files
 
@@ -187,6 +186,48 @@ Where the client has followed one there is no way to recover the URL from a PSR-
 and the methods say so rather than guess. **`$xf->attachments()->get($id)->thumbnail_url` is
 the same answer** out of a request you have probably already made, and it does not depend on
 how the client is configured; prefer it.
+
+## The bundled add-ons: Media Gallery and Resource Manager
+
+XFMG and XFRM are add-ons, not core, and a forum may have neither. Their endpoints are
+wrapped here as a convenience — this is the same extension mechanism described below, and
+these classes are what a third party's own `Resource` would look like.
+
+| accessor | tag | what it covers |
+|---|---|---|
+| `media()` | Media | media items, their comments, upload and download, reactions, featuring |
+| `mediaAlbums()` | Media albums | albums, their media and comments, reactions |
+| `mediaCategories()` | Media categories | the category tree, and a category's contents |
+| `mediaComments()` | Media comments | comments on either a media item or an album |
+| `resourceItems()` | Resources | resources, their versions, updates and reviews |
+| `resourceCategories()` | Resource categories | the category tree, and a category's resources |
+| `resourceReviews()` | Resource reviews | reviews, and the author's reply to one |
+| `resourceUpdates()` | Resource updates | the posts announcing a change to a resource |
+| `resourceVersions()` | Resource versions | releases, and downloading a release's files |
+
+```php
+$xf->media()->create(['album_id' => 4, 'title' => 'Sunset'], Upload::fromPath('/tmp/sunset.jpg'));
+
+$xf->resourceItems()->versions($resourceId);
+$xf->resourceVersions()->download($versionId, $fileId)->saveTo('/tmp/release.zip');
+```
+
+**A forum without the add-on answers 404 for every one of these paths**, which is the same
+answer a missing record gets — so `find()` returning `null` cannot be read as "no such
+media item" unless you already know the gallery is installed.
+`$xf->index()->get()->hasScope('media:read')` tells the two apart in one request.
+
+`resourceItems()` is the one accessor not named after its tag. `Resource` is already the
+base class of every resource here and `resource()` is already the extension point, so
+`resources()` would make one word mean two unrelated things; XenForo's own entity is
+`XFRM\Entity\ResourceItem`, and this borrows that.
+
+Two things in these add-ons are shaped unlike anything in core. `media-albums/{id}/` is the
+only endpoint in the API that paginates **two** lists at once, so its pagination blocks are
+named `media_pagination` and `comment_pagination` and `withContent()` pages them
+independently. And a resource version whose `download_url` is set is hosted somewhere else
+entirely — XFRM answers with a redirect rather than bytes, so check that field before
+calling `download()`.
 
 ## Errors
 

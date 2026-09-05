@@ -34,10 +34,18 @@ final class Page implements \IteratorAggregate, \Countable
      * @param  array<mixed>  $data  the decoded response body
      * @param  string  $key  the key holding the list, e.g. "users"
      * @param  callable(array<mixed>): TItem  $map  how to build one item
+     * @param  string  $paginationKey  which block describes this list. Almost always the
+     *         one called `pagination`, but an endpoint returning two paginated lists at
+     *         once has to name them apart - XFMG's `media-albums/{id}/` answers with
+     *         `media_pagination` and `comment_pagination` beside the single album.
      * @return self<TItem>
      */
-    public static function fromResponse(array $data, string $key, callable $map): self
-    {
+    public static function fromResponse(
+        array $data,
+        string $key,
+        callable $map,
+        string $paginationKey = 'pagination',
+    ): self {
         $items = [];
         $raw = $data[$key] ?? [];
 
@@ -49,7 +57,7 @@ final class Page implements \IteratorAggregate, \Countable
             }
         }
 
-        $pagination = is_array($data['pagination'] ?? null) ? $data['pagination'] : [];
+        $pagination = is_array($data[$paginationKey] ?? null) ? $data[$paginationKey] : [];
 
         // A non-paginated endpoint answering with a plain list still produces a usable
         // single page here, rather than a division by zero further down.

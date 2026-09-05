@@ -15,9 +15,18 @@ use Hampel\XenForo\Api\Resource\Conversations;
 use Hampel\XenForo\Api\Resource\Forums;
 use Hampel\XenForo\Api\Resource\Index;
 use Hampel\XenForo\Api\Resource\Me;
+use Hampel\XenForo\Api\Resource\Media;
+use Hampel\XenForo\Api\Resource\MediaAlbums;
+use Hampel\XenForo\Api\Resource\MediaCategories;
+use Hampel\XenForo\Api\Resource\MediaComments;
 use Hampel\XenForo\Api\Resource\Nodes;
 use Hampel\XenForo\Api\Resource\Posts;
 use Hampel\XenForo\Api\Resource\Resource;
+use Hampel\XenForo\Api\Resource\ResourceCategories;
+use Hampel\XenForo\Api\Resource\ResourceItems;
+use Hampel\XenForo\Api\Resource\ResourceReviews;
+use Hampel\XenForo\Api\Resource\ResourceUpdates;
+use Hampel\XenForo\Api\Resource\ResourceVersions;
 use Hampel\XenForo\Api\Resource\Search;
 use Hampel\XenForo\Api\Resource\Threads;
 use Hampel\XenForo\Api\Resource\Users;
@@ -221,6 +230,67 @@ final class Client
     public function search(): Search
     {
         return $this->resource(Search::class);
+    }
+
+    /**
+     * XenForo Media Gallery, if the forum has it.
+     *
+     * XFMG and XFRM below are add-ons rather than core, and every endpoint behind these
+     * accessors answers 404 on a forum without them - see the resource classes. They are
+     * wrapped here as a convenience, not as a promise: this is the same extension mechanism
+     * described on Client::resource(), and these classes are what a third party's own
+     * Resource subclass would look like.
+     */
+    public function media(): Media
+    {
+        return $this->resource(Media::class);
+    }
+
+    public function mediaAlbums(): MediaAlbums
+    {
+        return $this->resource(MediaAlbums::class);
+    }
+
+    public function mediaCategories(): MediaCategories
+    {
+        return $this->resource(MediaCategories::class);
+    }
+
+    public function mediaComments(): MediaComments
+    {
+        return $this->resource(MediaComments::class);
+    }
+
+    /**
+     * XenForo Resource Manager's resources, if the forum has it.
+     *
+     * Named resourceItems() rather than resources() deliberately: `resource()` above is
+     * this package's extension point, and the two would read as the same thing. See the
+     * ResourceItems class.
+     */
+    public function resourceItems(): ResourceItems
+    {
+        return $this->resource(ResourceItems::class);
+    }
+
+    public function resourceCategories(): ResourceCategories
+    {
+        return $this->resource(ResourceCategories::class);
+    }
+
+    public function resourceReviews(): ResourceReviews
+    {
+        return $this->resource(ResourceReviews::class);
+    }
+
+    public function resourceUpdates(): ResourceUpdates
+    {
+        return $this->resource(ResourceUpdates::class);
+    }
+
+    public function resourceVersions(): ResourceVersions
+    {
+        return $this->resource(ResourceVersions::class);
     }
 
     /**
