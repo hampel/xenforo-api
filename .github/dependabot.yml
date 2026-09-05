@@ -1,0 +1,15 @@
+version: 2
+
+updates:
+  # Actions are pinned to commit SHAs, which never update themselves. Without this the
+  # pins rot silently and CI keeps running an old checkout and setup-php forever.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+
+  # No composer entry on purpose: the lockfile is not committed, so there is nothing to
+  # bump, and the constraints in composer.json are deliberate policy rather than
+  # something to raise automatically.

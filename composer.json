@@ -1,0 +1,64 @@
+{
+    "name": "hampel/xenforo-api",
+    "description": "A PHP client for the XenForo REST API - core endpoints, add-on extensions and OAuth2 - over any PSR-18 HTTP client",
+    "authors": [
+        {
+            "name": "Simon Hampel",
+            "email": "simon@hampelgroup.com",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/hampel/xenforo-api/issues",
+        "source": "https://github.com/hampel/xenforo-api"
+    },
+    "keywords": [
+        "xenforo",
+        "forum",
+        "api",
+        "rest",
+        "psr-18"
+    ],
+    "homepage": "https://github.com/hampel/xenforo-api",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3",
+        "ext-json": "*",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-message": "^1.1|^2.0",
+        "psr/log": "^1.1|^2.0|^3.0"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^7.8|^8.0",
+        "hampel/rig": "^1.1",
+        "laravel/pint": "^1.30",
+        "phpstan/phpstan": "^2.1.22",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Hampel\\XenForo\\Api\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Hampel\\XenForo\\Api\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse",
+        "format": "pint",
+        "lint": "pint --test",
+        "generate": "php tools/generate-schemas.php",
+        "check": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ]
+    }
+}

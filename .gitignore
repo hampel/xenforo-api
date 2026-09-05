@@ -1,0 +1,12 @@
+vendor/
+composer.lock
+.idea/
+CLAUDE.local.md
+.phpunit.cache/
+.php-cs-fixer.cache
+
+# environment files for harness exercises - added with harness/, not with the
+# first credential, because the leak happens at the commit that adds the value
+.env
+.env.*
+!.env.example

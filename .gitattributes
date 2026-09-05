@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+# keep dev-only files out of the Packagist dist archive
+/.editorconfig  export-ignore
+/.env.example   export-ignore
+/.gitattributes export-ignore
+/.github        export-ignore
+/.gitignore     export-ignore
+/CLAUDE.md      export-ignore
+/harness        export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.xml    export-ignore
+/pint.json      export-ignore
+/resources      export-ignore
+/tests          export-ignore
+/tools          export-ignore

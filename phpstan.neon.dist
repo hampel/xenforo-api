@@ -1,0 +1,14 @@
+parameters:
+    level: 8
+
+    paths:
+        - src
+        - tests
+        - tools
+
+    # The whole supported range in one pass. The floor decides both halves of this - an
+    # availability failure anywhere in the range is reported, a deprecation only when it
+    # holds everywhere - so the newest-PHP corner of the CI matrix is not optional.
+    phpVersion:
+        min: 80300
+        max: 80500

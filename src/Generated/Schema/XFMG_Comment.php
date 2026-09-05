@@ -1,0 +1,116 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Hampel\XenForo\Api\Generated\Schema;
+
+use Hampel\XenForo\Api\Support\Cast;
+
+/**
+ * The XFMG_Comment entity, as the XenForo API returns it.
+ *
+ * Generated from the XenForo OpenAPI specification (version 1) by
+ * tools/generate-schemas.php. Do not edit by hand - run `composer generate`.
+ *
+ * Every field is nullable because a XenForo API result is not a fixed record: it
+ * varies by verbosity, by what the acting user may see, and by which add-ons the
+ * forum has installed. Fields this spec does not describe - one an add-on added by
+ * extending the entity's toApiResult() - are still available in $raw.
+ */
+final class XFMG_Comment
+{
+    public readonly ?string $username;
+
+    /** If requested by context, the media item this comment belongs to. */
+    public readonly ?XFMG_MediaItem $Media;
+
+    /** If requested by context, the album this comment belongs to. */
+    public readonly ?XFMG_Album $Album;
+
+    /** HTML parsed version of the message contents. */
+    public readonly ?string $message_parsed;
+
+    public readonly ?bool $can_edit;
+
+    public readonly ?bool $can_soft_delete;
+
+    public readonly ?bool $can_hard_delete;
+
+    public readonly ?bool $can_react;
+
+    public readonly ?string $view_url;
+
+    /** True if the viewing user has reacted to this content */
+    public readonly ?bool $is_reacted_to;
+
+    /** If the viewer reacted, the ID of the reaction they used */
+    public readonly ?int $visitor_reaction_id;
+
+    public readonly ?int $comment_id;
+
+    public readonly ?int $content_id;
+
+    public readonly ?string $content_type;
+
+    public readonly ?string $message;
+
+    public readonly ?int $user_id;
+
+    public readonly ?int $comment_date;
+
+    public readonly ?string $comment_state;
+
+    public readonly ?string $warning_message;
+
+    public readonly ?int $last_edit_date;
+
+    public readonly ?int $reaction_score;
+
+    public readonly ?User $User;
+
+    /**
+     * The response data this entity was built from, exactly as it arrived.
+     *
+     * @var array<mixed>
+     */
+    public readonly array $raw;
+
+    /**
+     * @param  array<mixed>  $data
+     */
+    public function __construct(array $data)
+    {
+        $this->raw = $data;
+
+        $this->username = Cast::string($data['username'] ?? null);
+        $this->Media = is_array($data['Media'] ?? null) ? XFMG_MediaItem::fromArray($data['Media']) : null;
+        $this->Album = is_array($data['Album'] ?? null) ? XFMG_Album::fromArray($data['Album']) : null;
+        $this->message_parsed = Cast::string($data['message_parsed'] ?? null);
+        $this->can_edit = Cast::bool($data['can_edit'] ?? null);
+        $this->can_soft_delete = Cast::bool($data['can_soft_delete'] ?? null);
+        $this->can_hard_delete = Cast::bool($data['can_hard_delete'] ?? null);
+        $this->can_react = Cast::bool($data['can_react'] ?? null);
+        $this->view_url = Cast::string($data['view_url'] ?? null);
+        $this->is_reacted_to = Cast::bool($data['is_reacted_to'] ?? null);
+        $this->visitor_reaction_id = Cast::int($data['visitor_reaction_id'] ?? null);
+        $this->comment_id = Cast::int($data['comment_id'] ?? null);
+        $this->content_id = Cast::int($data['content_id'] ?? null);
+        $this->content_type = Cast::string($data['content_type'] ?? null);
+        $this->message = Cast::string($data['message'] ?? null);
+        $this->user_id = Cast::int($data['user_id'] ?? null);
+        $this->comment_date = Cast::int($data['comment_date'] ?? null);
+        $this->comment_state = Cast::string($data['comment_state'] ?? null);
+        $this->warning_message = Cast::string($data['warning_message'] ?? null);
+        $this->last_edit_date = Cast::int($data['last_edit_date'] ?? null);
+        $this->reaction_score = Cast::int($data['reaction_score'] ?? null);
+        $this->User = is_array($data['User'] ?? null) ? User::fromArray($data['User']) : null;
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self($data);
+    }
+}
