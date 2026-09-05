@@ -59,15 +59,17 @@ jobs:
           php-version: '8.3'
           coverage: none
 
-      # Two checks here, and they catch different things. This one needs the dev
-      # dependencies PRESENT, so it goes first: composer-require-checker maps every symbol
-      # src/ uses back to the package that provides it, and a package that is not installed
-      # cannot be mapped. It is the only half that sees a TRANSITIVE dependency - one
-      # arriving through something we did declare, which survives --no-dev and so reports
-      # clean below - and the only half that sees a missing ext-*, which is invisible to
-      # static analysis because a function from an absent extension looks exactly like one
-      # from core. ext-ctype was undeclared from 0.1.0 to 0.3.0 for precisely that reason,
-      # with the check below green on every push.
+      # Two checks here, and they catch different things.
+      #
+      # composer-require-checker maps every symbol src/ uses back to the package that
+      # declares it. Its answer comes from "require" and NOT from what is installed - a
+      # symbol supplied by a dev dependency is reported with that dependency sitting in
+      # vendor/ - so it is indifferent to which install it runs against. It is the only
+      # half that sees a TRANSITIVE dependency, one arriving through something we did
+      # declare, which survives --no-dev and so reports clean below. And it is the only
+      # half that sees a missing ext-*, which is invisible to static analysis because a
+      # function from an absent extension looks exactly like one from core. That is not
+      # hypothetical here: ctype_digit() in src/ went undeclared until this check named it.
       - run: composer install --prefer-dist --no-progress
 
       # Same shape as the phpstan step below, and the same trap: composer -d does not
