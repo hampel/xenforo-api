@@ -57,7 +57,7 @@ $info->hasScope('user:write');
 
 ## What is wrapped
 
-157 of the API's 162 endpoints, through these accessors:
+**All 162 endpoints in XenForo's specification**, through these accessors:
 
 | | |
 |---|---|
@@ -68,14 +68,18 @@ $info->hasScope('user:write');
 | `profilePosts()` `profilePostComments()` | profile posts and their replies |
 | `conversations()` `conversationMessages()` | private conversations |
 | `attachments()` | uploads, downloads, and the keys they go against |
-| `search()` | search, and re-reading a previous result |
+| `search()` `searchForums()` | search, saved searches, and re-reading a previous result |
+| `featured()` `stats()` `oembed()` | featured content, site statistics, oEmbed for a URL |
 | `oauth2()` | the token endpoints: exchange, refresh, introspect, revoke |
 | `media()` `mediaAlbums()` `mediaCategories()` `mediaComments()` | XenForo Media Gallery |
 | `resourceItems()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
 
-Not wrapped: oEmbed, stats, featured content, and the two search-forum endpoints.
-All of them are one `connection()->get()` or `->post()` away, and a `Resource` subclass is
-how to make that permanent — see [Extending it](#extending-it-for-add-on-endpoints).
+Coverage is checked in both directions by `SpecConformanceTest`: every path a resource
+calls exists in the specification, and every endpoint the specification describes is called
+by a resource. A future spec bringing new endpoints fails that second check by name.
+
+What no client can cover is what an add-on adds — see
+[Extending it](#extending-it-for-add-on-endpoints).
 
 ## Authenticating
 
@@ -428,7 +432,9 @@ exposes to its consumers is the seam the tests drive it through.
 `SpecConformanceTest` is the one worth knowing about. It reads the paths out of the resource
 classes and checks each against XenForo's specification, because the resources are
 hand-written and a mistyped path is a 404 at runtime that every stubbed test passes either
-way.
+way. It also checks the reverse — that nothing in the specification is unwrapped — so
+updating `resources/openapi.json` reports what XenForo has added rather than passing
+silently.
 
 ## Exercising it against a real forum
 

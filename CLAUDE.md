@@ -21,7 +21,7 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Client.php` | the entry point; named accessors and `resource()` |
 | `src/Connection.php` | everything that touches HTTP |
 | `src/Authentication/` | the four ways XenForo will authenticate a request, plus guest |
-| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - 157 of the API's 162 endpoints |
+| `src/Resource/` | hand-written endpoint groups, and the `Resource` base class - every one of the API's 162 endpoints |
 | `src/Resource/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
 | `src/Result/` | `ApiResponse`, `ResponseMeta`, `Page`, `SiteInfo`, `Download` |
@@ -126,7 +126,14 @@ something should say so.
 - **Every response carries `XF-Used-Api-Version` and `XF-Latest-Api-Version`.** They are
   the only notice a client gets that the forum has moved on. `Connection` logs it.
 - **`GET /index/`** reports the version, the key type and its scopes. It is the cheapest
-  way to find out that a URL or a key is wrong.
+  way to find out that a URL or a key is wrong. `GET /stats/` is nearly as cheap and comes
+  from the forum's cached statistics rather than from a count.
+- **`oembed/` embeds the forum's OWN content.** It routes the URL through XenForo's public
+  router, so a link to anywhere else answers `requested_content_unavailable`. Whether it
+  needs a key at all is the board's `allowExternalEmbed` option.
+- **A search forum has no sticky threads**, though the specification says it does - the
+  annotation the docs were built from is shared with the real forum endpoint. It is also
+  the one list a super-user bypass does not widen, being served from a per-user cache.
 
 ## The harness
 

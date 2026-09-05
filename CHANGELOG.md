@@ -15,8 +15,8 @@ Initial development. Nothing is released, so nothing here is a change from anyth
 * 33 entity classes generated from XenForo's OpenAPI specification by
   `tools/generate-schemas.php`, pinned to `resources/openapi.json` taken from
   https://github.com/xenforo-ltd/docs `static/api/openapi.json` on 2026-09-05
-* `SpecConformanceTest` checks every endpoint the resources call against that specification -
-  157 of the API's 162 endpoints are wrapped
+* `SpecConformanceTest` checks the resources against that specification in both directions -
+  every path called exists, and every endpoint described is called. All 162 are wrapped
 * file uploads: `Upload`, `Multipart` and `Connection::postMultipart()`, covering the five
   core endpoints that take a file - `attachments/`, `attachments/new-key`, `me/avatar`,
   `users/{id}/avatar` and `threads/{id}/feature` - plus `threads/{id}/unfeature`
@@ -31,4 +31,7 @@ Initial development. Nothing is released, so nothing here is a change from anyth
   `resourceUpdates` and `resourceVersions` - all 62 endpoints of the nine XFMG/XFRM tags
 * `Page::fromResponse()` takes a pagination key, for `media-albums/{id}/` - the one endpoint
   in the API that paginates two lists at once
+* the last of the core endpoints: `featured`, `stats`, `oembed` and `searchForums`, with
+  `Result\SiteStats` and `Result\Embed` hand-written for the two whose specification
+  describes an annotation rather than the JSON
 * harness exercises: `index`, `read`, `pagination`, `encoding` and `upload`

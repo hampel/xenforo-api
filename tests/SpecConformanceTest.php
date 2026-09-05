@@ -19,8 +19,12 @@ use PHPUnit\Framework\TestCase as BaseTestCase;
  * The paths are read out of the source rather than by calling anything, so this runs with
  * no network and no forum.
  *
- * What it deliberately does NOT do is require the reverse - that this package covers every
- * endpoint in the spec. Coverage is a scope decision; a typo is a defect.
+ * It now checks the reverse as well, which it did not always. Coverage is a scope decision
+ * rather than a defect, so requiring it only made sense once it was complete - and it is:
+ * every endpoint in the specification is wrapped. Keeping that true is the point. When
+ * `resources/openapi.json` is next updated, whatever XenForo has added shows up here as a
+ * named failure rather than as nothing at all, which is the only moment anybody would
+ * otherwise have noticed.
  */
 final class SpecConformanceTest extends BaseTestCase
 {
@@ -54,6 +58,49 @@ final class SpecConformanceTest extends BaseTestCase
                 $paths[$path],
                 static fn (mixed $operation): bool => is_array($operation)
             ))))
+        ));
+    }
+
+    /**
+     * The other direction: nothing in the specification is missing from this package.
+     *
+     * There is no allow-list of deliberate omissions, and adding an empty one now would be
+     * speculation. If a future specification brings an endpoint that should NOT be wrapped,
+     * the decision belongs here, in the diff, with the reason beside it - which is a better
+     * record than a list nobody revisits.
+     */
+    public function test_every_endpoint_in_the_specification_is_wrapped(): void
+    {
+        $wrapped = [];
+
+        foreach (self::extractCalls() as [, $method, $path]) {
+            $wrapped[$method . ' ' . $path] = true;
+        }
+
+        $missing = [];
+
+        /** @var array<string, array<mixed>> $paths */
+        $paths = self::spec()['paths'];
+
+        foreach ($paths as $path => $operations) {
+            foreach ($operations as $method => $operation) {
+                if (!is_array($operation) || !isset($operation['responses'])) {
+                    continue; // the shared `parameters` block, which is not an operation
+                }
+
+                $endpoint = strtoupper($method) . ' ' . $path;
+
+                if (!isset($wrapped[$endpoint])) {
+                    $missing[] = $endpoint;
+                }
+            }
+        }
+
+        $this->assertSame([], $missing, sprintf(
+            "The specification describes %d endpoint(s) no resource class calls:\n  %s\n"
+                . 'Wrap them, or record here why not.',
+            count($missing),
+            implode("\n  ", $missing)
         ));
     }
 

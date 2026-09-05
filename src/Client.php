@@ -12,6 +12,7 @@ use Hampel\XenForo\Api\Resource\Attachments;
 use Hampel\XenForo\Api\Resource\Auth;
 use Hampel\XenForo\Api\Resource\ConversationMessages;
 use Hampel\XenForo\Api\Resource\Conversations;
+use Hampel\XenForo\Api\Resource\Featured;
 use Hampel\XenForo\Api\Resource\Forums;
 use Hampel\XenForo\Api\Resource\Index;
 use Hampel\XenForo\Api\Resource\Me;
@@ -21,6 +22,7 @@ use Hampel\XenForo\Api\Resource\MediaCategories;
 use Hampel\XenForo\Api\Resource\MediaComments;
 use Hampel\XenForo\Api\Resource\Nodes;
 use Hampel\XenForo\Api\Resource\OAuth2;
+use Hampel\XenForo\Api\Resource\OEmbed;
 use Hampel\XenForo\Api\Resource\Posts;
 use Hampel\XenForo\Api\Resource\ProfilePostComments;
 use Hampel\XenForo\Api\Resource\ProfilePosts;
@@ -31,6 +33,8 @@ use Hampel\XenForo\Api\Resource\ResourceReviews;
 use Hampel\XenForo\Api\Resource\ResourceUpdates;
 use Hampel\XenForo\Api\Resource\ResourceVersions;
 use Hampel\XenForo\Api\Resource\Search;
+use Hampel\XenForo\Api\Resource\SearchForums;
+use Hampel\XenForo\Api\Resource\Stats;
 use Hampel\XenForo\Api\Resource\Threads;
 use Hampel\XenForo\Api\Resource\Users;
 use Psr\Http\Client\ClientInterface;
@@ -279,6 +283,26 @@ final class Client
     public function search(): Search
     {
         return $this->resource(Search::class);
+    }
+
+    public function searchForums(): SearchForums
+    {
+        return $this->resource(SearchForums::class);
+    }
+
+    public function featured(): Featured
+    {
+        return $this->resource(Featured::class);
+    }
+
+    public function stats(): Stats
+    {
+        return $this->resource(Stats::class);
+    }
+
+    public function oembed(): OEmbed
+    {
+        return $this->resource(OEmbed::class);
     }
 
     /**
