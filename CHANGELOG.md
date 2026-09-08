@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+1.0.0 (2026-09-09)
+------------------
 
 * Initial release
 * `src/Generated/Schema` generated from `resources/openapi.json`, taken from
