@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\XenForo\Api\Endpoint;
 
 use Hampel\XenForo\Api\Connection;
+use Hampel\XenForo\Api\Exception\EndpointNotFoundException;
 use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Result\ApiResponse;
 use Hampel\XenForo\Api\Result\Page;
@@ -130,10 +131,13 @@ abstract class Endpoint
     /**
      * A lookup where "no such thing" is an ordinary answer rather than a failure.
      *
-     * XenForo answers 404 for a record that is not there, for a record the acting user may
-     * not see, and for a route that does not exist on this forum - an add-on endpoint that
-     * is not installed. All three are indistinguishable here, which is worth knowing before
-     * reading a null as "no such user".
+     * XenForo answers 404 for a record that is not there and, on some controllers, for one
+     * the acting user may not see; those two are indistinguishable here and both read as
+     * null. A ROUTE that does not exist - an add-on's endpoint on a forum without the
+     * add-on - is a 404 too, but XenForo marks it `endpoint_not_found`, and that one is
+     * rethrown as EndpointNotFoundException rather than returned as null: it is a
+     * configuration problem, and dressing it as "no such user" is the failure this package
+     * exists to avoid.
      *
      * @template TItem
      * @param  array<string, scalar|array<mixed>|null>  $query
@@ -142,11 +146,13 @@ abstract class Endpoint
      */
     protected function apiFind(string $path, array $query, string $key, callable $map): mixed
     {
-        try {
-            $data = $this->apiGet($path, $query)->array($key);
-        } catch (NotFoundException) {
+        $response = $this->apiFindResponse($path, $query);
+
+        if ($response === null) {
             return null;
         }
+
+        $data = $response->array($key);
 
         return $data === [] ? null : $map($data);
     }
@@ -158,8 +164,8 @@ abstract class Endpoint
      * single named object, which is what apiFind() is shaped for - but an add-on endpoint
      * is free to put three things at the top level, and often does: a user AND the URLs to
      * reach them by, a record AND the field it was matched on. Mapping one key would throw
-     * the rest away, and the rest is frequently the point. Same 404-to-null rule as
-     * apiFind(), same three indistinguishable causes.
+     * the rest away, and the rest is frequently the point. Same 404 rule as apiFind(): a
+     * missing record is null, a missing route raises.
      *
      * @param  array<string, scalar|array<mixed>|null>  $query
      */
@@ -167,6 +173,8 @@ abstract class Endpoint
     {
         try {
             return $this->apiGet($path, $query);
+        } catch (EndpointNotFoundException $e) {
+            throw $e;
         } catch (NotFoundException) {
             return null;
         }

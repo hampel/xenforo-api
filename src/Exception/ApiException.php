@@ -62,6 +62,8 @@ abstract class ApiException extends XenForoException
         return match (true) {
             $status === 401 => new NotAuthenticatedException($message, $status, $errors, $body),
             $status === 403 => new NotPermittedException($message, $status, $errors, $body),
+            $status === 404 && self::carries($errors, EndpointNotFoundException::CODE)
+                => new EndpointNotFoundException($message, $status, $errors, $body),
             $status === 404 => new NotFoundException($message, $status, $errors, $body),
             $status === 429 => new TooManyRequestsException($message, $status, $errors, $body),
             $status >= 500 => new ServerException($message, $status, $errors, $body),
@@ -94,6 +96,20 @@ abstract class ApiException extends XenForoException
     public function codes(): array
     {
         return array_map(static fn (ApiError $error): string => $error->code, $this->errors);
+    }
+
+    /**
+     * @param  list<ApiError>  $errors
+     */
+    private static function carries(array $errors, string $code): bool
+    {
+        foreach ($errors as $error) {
+            if ($error->code === $code) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

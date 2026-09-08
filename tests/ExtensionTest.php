@@ -6,7 +6,9 @@ namespace Hampel\XenForo\Api\Tests;
 
 use Hampel\XenForo\Api\Endpoint\Endpoint;
 use Hampel\XenForo\Api\Endpoint\Users;
+use Hampel\XenForo\Api\Exception\EndpointNotFoundException;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
+use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Tests\Fixture\UserFindCriteria;
 
 /**
@@ -37,15 +39,30 @@ final class ExtensionTest extends TestCase
     }
 
     /**
-     * A forum without the add-on installed has no such route, and XenForo answers 404 -
-     * the same 404 as "no such user". apiFind() turns both into null, which is the right
-     * answer for this endpoint and worth knowing is not distinguishable.
+     * XenForo tells a missing record from a missing route, by code: `requested_page_not_found`
+     * against `endpoint_not_found`. The first is "no such user" and reads as null; the
+     * second is "this forum does not have the add-on", which is a configuration problem
+     * and must not wear the costume of an ordinary miss. Measured on 2.3.12.
      */
-    public function test_a_missing_endpoint_reads_as_no_result(): void
+    public function test_no_such_user_reads_as_null(): void
     {
         $this->client->pushError(404, [['code' => 'requested_page_not_found']]);
 
         $this->assertNull($this->xenforo()->endpoint(UserFindCriteria::class)->byUsername('nobody'));
+    }
+
+    public function test_a_forum_without_the_add_on_raises_rather_than_reading_as_no_result(): void
+    {
+        $this->client->pushError(404, [['code' => 'endpoint_not_found']]);
+
+        try {
+            $this->xenforo()->endpoint(UserFindCriteria::class)->byUsername('anybody');
+
+            $this->fail('A missing route should have raised.');
+        } catch (EndpointNotFoundException $e) {
+            $this->assertInstanceOf(NotFoundException::class, $e, 'Catching NotFoundException must still see it.');
+            $this->assertTrue($e->hasCode('endpoint_not_found'));
+        }
     }
 
     public function test_an_extension_can_return_data_no_core_endpoint_produces(): void
