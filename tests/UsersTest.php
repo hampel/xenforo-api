@@ -4,8 +4,24 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Tests;
 
+use Hampel\XenForo\Api\Exception\MalformedResponseException;
+
 final class UsersTest extends TestCase
 {
+    /**
+     * find() answers null for a 404 and only a 404. A maintenance page is a 200 with HTML
+     * in it, and reading that as "no such user" is the one failure a null cannot be
+     * allowed to hide - so it raises, and it raises something a catch of ApiException sees.
+     */
+    public function test_find_does_not_read_a_maintenance_page_as_no_such_user(): void
+    {
+        $this->client->pushRaw(200, '<html>maintenance</html>', ['Content-Type' => 'text/html']);
+
+        $this->expectException(MalformedResponseException::class);
+
+        $this->xenforo()->users()->find(1);
+    }
+
     public function test_it_gets_a_user(): void
     {
         $this->client->pushJson(200, ['user' => [

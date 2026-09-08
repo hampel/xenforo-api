@@ -99,7 +99,7 @@ abstract class ApiException extends XenForoException
      * A non-JSON body, cut down to something that belongs in an exception message. An HTML
      * error page is frequently kilobytes long and none of it helps.
      */
-    private static function summarise(string $body): string
+    protected static function summarise(string $body): string
     {
         $body = trim(preg_replace('/\s+/', ' ', $body) ?? '');
 

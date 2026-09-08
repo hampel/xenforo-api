@@ -7,6 +7,7 @@ namespace Hampel\XenForo\Api;
 use Hampel\XenForo\Api\Authentication\Authentication;
 use Hampel\XenForo\Api\Exception\ApiException;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
+use Hampel\XenForo\Api\Exception\MalformedResponseException;
 use Hampel\XenForo\Api\Exception\RequestException;
 use Hampel\XenForo\Api\Result\ApiResponse;
 use Hampel\XenForo\Api\Result\ResponseMeta;
@@ -275,7 +276,33 @@ final class Connection
         if ($status >= 200 && $status < 300) {
             $this->noteVersion($meta);
 
-            return new ApiResponse($decoded ?? [], $status, $meta);
+            if ($decoded !== null) {
+                return new ApiResponse($decoded, $status, $meta);
+            }
+
+            if ($status === 204) {
+                // No Content, and nothing in XenForo's own API sends one - but it is the
+                // one success status whose empty body means what it says.
+                return new ApiResponse([], $status, $meta);
+            }
+
+            // A 2xx that did not decode is not an empty answer, it is somebody else's
+            // answer - a maintenance page, a WAF, a CDN interstitial, a truncated body.
+            // Returned as [] it would read as "no such record" everywhere downstream,
+            // which is precisely the failure this package exists to keep visible.
+            $this->logger->error('XenForo API answered success with a body that is not JSON', [
+                'method' => $request->getMethod(),
+                'uri' => (string) $request->getUri(),
+                'status' => $status,
+                'content_type' => $response->getHeaderLine('Content-Type'),
+            ]);
+
+            throw MalformedResponseException::forResponse(
+                $request->getMethod(),
+                (string) $request->getUri(),
+                $response,
+                $body
+            );
         }
 
         $this->logger->error('XenForo API error response', [
