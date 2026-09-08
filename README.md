@@ -20,25 +20,20 @@ composer require guzzlehttp/guzzle    # or any PSR-18 implementation
 
 ```php
 use GuzzleHttp\Client as Guzzle;
-use GuzzleHttp\Psr7\HttpFactory;
 use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Client;
 use Hampel\XenForo\Api\Config;
 
-$factory = new HttpFactory();      // PSR-17, both roles
-
-$xf = new Client(
-    new Config('https://forum.example.com'),
-    new ApiKey($key),
-    new Guzzle(),
-    $factory,
-    $factory
-);
+$xf = new Client(new Config('https://forum.example.com'), new ApiKey($key), new Guzzle());
 
 $thread = $xf->threads()->get(1234);
 
 echo $thread->title;
 ```
+
+The third argument is any PSR-18 client. The package also needs a PSR-17 factory to build
+requests with, and finds one itself — Guzzle's, Nyholm's or Diactoros', whichever is
+installed — unless you pass your own as the fourth and fifth arguments.
 
 `Config` takes the board URL or the API URL — either works, and the `/api` suffix is added
 if it is missing. Create the key in the forum's admin panel under **Setup → API keys**.
@@ -116,7 +111,7 @@ The token endpoints need **no credential of their own** — XenForo declares the
 as well, because a process exchanging a code has no key yet:
 
 ```php
-$xf = new Client(new Config($boardUrl), new Guest(), $http, $factory, $factory);
+$xf = new Client(new Config($boardUrl), new Guest(), $http);
 
 $token = $xf->oauth2()->exchangeCode($clientId, $code, $redirectUri, $clientSecret);
 
@@ -421,7 +416,14 @@ read against the API documentation:
 $thread->thread_id;
 $thread->Forum->title;      // nested entities are resolved
 $thread->raw['whatever'];   // fields no specification mentions
+json_encode($thread);       // the payload as it arrived - no more, no less
 ```
+
+`json_encode()` of an entity emits the payload it was built from, not the typed fields.
+The typed fields are all nullable, so serialising them would render a field the credential
+was not allowed to see as `null` — and XenForo omits those rather than blanking them — and
+would drop anything an add-on added. The payload round-trips through `fromArray()`; the
+typed set does not. `ApiResponse` serialises to its body the same way.
 
 **A field you may not see is omitted, not sent as null.** XenForo builds each result with
 `includeColumn()`, so `email`, `user_state`, `user_group_id` and `is_banned` on a user are
@@ -498,9 +500,7 @@ $mock = new \GuzzleHttp\Handler\MockHandler([
 $xf = new Client(
     new Config('https://forum.example.com'),
     new ApiKey('test'),
-    new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create($mock)]),
-    $factory,
-    $factory
+    new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create($mock)])
 );
 ```
 

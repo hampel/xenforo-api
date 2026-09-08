@@ -27,7 +27,7 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Result/` | what an endpoint answers with, where that is not an entity |
 | `src/Exception/` | the hierarchy, from `XenForoException` down |
 | `src/Upload.php`, `src/Multipart.php` | files going out, and the `multipart/form-data` body that carries them |
-| `src/Support/` | coercion, and the field naming shared by both body encodings |
+| `src/Support/` | coercion, the field naming shared by both body encodings, and PSR-17 discovery |
 | `resources/openapi.json` | XenForo's own specification, pinned |
 | `tools/generate-schemas.php` | the generator |
 | `harness/` | rig exercises - real calls to a real forum |
