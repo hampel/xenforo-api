@@ -321,9 +321,20 @@ try {
 
 The hierarchy is `RuntimeException` → `XenForoException` → `ApiException` →
 `ClientException` (4xx) or `ServerException` (5xx), with `NotAuthenticatedException` (401),
-`NotPermittedException` (403) and `NotFoundException` (404) under `ClientException`. Every
-one of them implements `ExceptionInterface`, so a consumer can catch the package's failures
-with one clause and let everything else through.
+`NotPermittedException` (403), `NotFoundException` (404) and `TooManyRequestsException`
+(429) under `ClientException`. Every one of them implements `ExceptionInterface`, so a
+consumer can catch the package's failures with one clause and let everything else through.
+
+**An unusable key and a missing record are different exceptions**, which is the reason to
+have the hierarchy at all. A client that reports every unsuccessful status the same way
+cannot tell a rejected credential from a user who is not a member — both are an empty
+result — and the first is a configuration error that should fail loudly.
+
+**A 200 that is not JSON raises too**, as `MalformedResponseException`. The forum is not
+the only thing that answers on its URL: a maintenance page, a WAF challenge, a CDN
+interstitial and a truncated body are all a 200 with HTML or nothing in it, and read as an
+empty answer every one of them would reach you as "no such record". It is an
+`ApiException`, so catching that is enough to see it.
 
 **Read the code rather than the status.** XenForo answers 400 for most things a caller got
 wrong — a missing required input, a validation failure, a page past the end — so the status
@@ -342,29 +353,46 @@ For a one-off, call it directly:
 $xf->connection()->get('users/find-criteria', ['email' => $email])->data;
 ```
 
-For anything used more than once, write an `Endpoint`:
+For anything used more than once, write an `Endpoint`. This one answers with a `user`
+*and* a `urls` block beside it, which is the usual shape of an add-on endpoint — so it maps
+the whole response rather than one key of it:
 
 ```php
-use Hampel\XenForo\Api\Generated\Schema\User;
 use Hampel\XenForo\Api\Endpoint\Endpoint;
+use Hampel\XenForo\Api\Generated\Schema\User;
 
 final class UserFindCriteria extends Endpoint
 {
-    public function byEmail(string $email): ?User
+    /** @return array{user: User, urls: array<string, string>}|null */
+    public function byEmail(string $email): ?array
     {
-        return $this->apiFind('users/find-criteria', ['email' => $email], 'user', User::fromArray(...));
+        $response = $this->apiFindResponse('users/find-criteria', ['email' => $email]);
+
+        if ($response === null) {
+            return null;                                  // 404: no such user, or no such add-on
+        }
+
+        return [
+            'user' => User::fromArray($response->array('user')),
+            'urls' => $response->array('urls'),
+        ];
     }
 }
 
 $xf->endpoint(UserFindCriteria::class)->byEmail('someone@example.com');
 ```
 
+`apiFind()` is the shorter form for an endpoint that answers with a single named object,
+which is most of core XenForo; it maps that one key and discards the rest, so on an
+envelope it is the wrong tool. `tests/Fixture/UserFindCriteria.php` is the complete version
+of the class above.
+
 There is nothing to register, no container and no string keys — the class *is* the
 registration, so a third party can ship one in its own package and a consumer's static
 analysis follows the return type all the way through. `Client::endpoint()` memoises by class
 name, and the built-in accessors like `users()` are the same mechanism with a shorter name.
 
-Subclassing buys you `apiPaginate()`, `apiEach()` and `apiFind()`, which work unchanged for
+Subclassing buys you `apiPaginate()`, `apiEach()`, `apiFind()` and `apiFindResponse()`, which work unchanged for
 an endpoint this package has never heard of, because every paginated endpoint in XenForo —
 core, first-party add-on, third-party add-on — builds its pagination block with the same
 `AbstractController::getPaginationData()`.
@@ -380,6 +408,12 @@ $thread->thread_id;
 $thread->Forum->title;      // nested entities are resolved
 $thread->raw['whatever'];   // fields no specification mentions
 ```
+
+**A field you may not see is omitted, not sent as null.** XenForo builds each result with
+`includeColumn()`, so `email`, `user_state`, `user_group_id` and `is_banned` on a user are
+simply absent from the JSON when the credential lacks the standing to see them. On an
+entity that reads as `null` either way; on the raw response `ApiResponse::has()` tells the
+two apart, and an absent key is nearly always a problem with the key rather than the data.
 
 **Every field is nullable, and that is not defensiveness.** A XenForo API result is not a
 fixed record: it varies by verbosity, by what the acting user may see, and by which add-ons
@@ -430,6 +464,37 @@ hand-written and a mistyped path is a 404 at runtime that every stubbed test pas
 way. It also checks the reverse — that nothing in the specification is unwrapped — so
 updating `resources/openapi.json` reports what XenForo has added rather than passing
 silently.
+
+### Testing code that uses this package
+
+Inject a fake PSR-18 client, not a fake `Client`. The package builds its own requests and
+maps its own responses, and both are the part worth keeping under test — a mocked `Client`
+lets a test invent response shapes XenForo never sends, and a suite built on those endorses
+whatever the mock says. With Guzzle:
+
+```php
+$mock = new \GuzzleHttp\Handler\MockHandler([
+    new \GuzzleHttp\Psr7\Response(200, [], json_encode(['user' => ['user_id' => 1]])),
+]);
+
+$xf = new Client(
+    new Config('https://forum.example.com'),
+    new ApiKey('test'),
+    new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create($mock)]),
+    $factory,
+    $factory
+);
+```
+
+Everything above the transport — URL building, the `Content-Type` rule, status mapping,
+`NotFoundException` versus `MalformedResponseException` — still runs. A framework's HTTP
+facade fake does not see any of it, because the package holds its own client; in Laravel
+that means `Http::fake()` has no effect here, and the mock handler goes in through
+whatever builds the `Client`.
+
+Where the fixture body matters, capture one from a real forum rather than writing it. The
+fields a result carries depend on the credential, and a hand-written body will include
+what you expect rather than what XenForo sends.
 
 ## Exercising it against a real forum
 

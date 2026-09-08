@@ -116,6 +116,15 @@ something should say so.
 - **A missing API key is not a 401.** `\XF\Api\App::validateRequest()` sets `apiKeyOmitted`
   and carries on as a guest, so unauthenticated endpoints answer normally and everything
   else answers 400 `no_api_key_in_request`.
+- **A 2xx whose body is not JSON is somebody else's answer.** A maintenance page, a WAF
+  challenge, a CDN interstitial and a truncated response are all a 200 with HTML or
+  nothing in it. `Connection::send()` raises `MalformedResponseException` rather than
+  decode them as an empty body, because empty would reach every caller as "no such
+  record". A 204 is the one success with a legitimately empty body.
+- **A field the credential may not see is omitted, not blanked.** XenForo builds results
+  with `includeColumn()`, so `email`, `user_state`, `user_group_id` and `is_banned` are
+  absent from the JSON rather than null when the key lacks the standing.
+  `ApiResponse::has()` is how to tell; `value()` with a default cannot.
 - **Read the error code, not the status.** XenForo answers 400 for most caller mistakes -
   a missing input, a validation failure, a page past the end.
 - **A page past the last one is an error, not an empty page.** `assertValidApiPage()`
