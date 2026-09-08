@@ -62,6 +62,16 @@ final class Connection
      * so a JSON-bodied client would work for creates and quietly do nothing for updates.
      * This package never sends JSON: everything is form-encoded, bar the handful of
      * endpoints that take a file and declare multipart, so it never meets that either.
+     *
+     * A SECOND THING DEPENDS ON THIS BEING EXACT, on the consumer's side rather than the
+     * forum's. Laravel's \Illuminate\Http\Client\Request::isForm() is
+     * hasHeader('Content-Type', 'application/x-www-form-urlencoded') - an exact match too -
+     * and isForm() gates data(), which is what Http::assertSent(fn ($r) => $r['title'] ===
+     * 'Hello') reads. So a consumer's Laravel tests can assert on this package's request
+     * bodies only because the header carries no parameter. Tidy it to the conventional
+     * form and two things break at once, with no error from either: XenForo discards the
+     * body on a DELETE, and every body assertion in every consumer's test compares against
+     * an empty array.
      */
     public const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
@@ -374,6 +384,14 @@ final class Connection
      * Everything both of the above do before they differ: log it, send it, and keep a
      * transport failure distinct from an HTTP status. A PSR-18 client throws only for the
      * former, which is what makes that separation free.
+     *
+     * The catch is ClientExceptionInterface and not \Throwable, deliberately. Anything else
+     * a client throws is not a transport failure and must not be dressed as one: Laravel's
+     * StrayRequestException, raised by Http::preventStrayRequests() when a request escapes
+     * the fakes, is a plain RuntimeException, and it reaches the consumer's test with
+     * Laravel's own message naming the URL only because it passes through here untouched.
+     * Widened, it would arrive as "could not reach the XenForo API", which is the wrong
+     * diagnosis in the one place a wrong diagnosis is most expensive.
      */
     private function dispatch(RequestInterface $request): ResponseInterface
     {
