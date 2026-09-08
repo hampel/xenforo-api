@@ -16,7 +16,17 @@ use Hampel\XenForo\Api\Upload;
 final class Threads extends Endpoint
 {
     /**
-     * One page of threads, optionally filtered.
+     * One page of threads across the whole forum - RECENTLY ACTIVE ones, unless you say
+     * otherwise.
+     *
+     * This is not the list of every thread, and nothing in the response says so. Without
+     * a `last_days` filter, and under the default sort, ThreadsController::setupThreadFinder()
+     * adds `last_post_date > getReadMarkingCutOff()` - the read-marking window, 30 days by
+     * default - so a forum with years of threads and a quiet month answers 200 with
+     * `total: 0`. That is a silent empty of exactly the kind this package documents
+     * elsewhere, and it is XenForo's, not a permission or a bug. Pass `last_days` to widen
+     * the window, sort by something other than `last_post_date` to lift it, or use
+     * Forums::threads() - the per-forum list applies no cutoff at all.
      *
      * @param  array<string, scalar|array<mixed>|null>  $filters  prefix_id, starter_id,
      *         last_days, unread, thread_type, order, direction - see the API docs
@@ -28,6 +38,9 @@ final class Threads extends Endpoint
     }
 
     /**
+     * Every thread the global list would show - which, see list(), is the recently active
+     * ones unless `last_days` says otherwise.
+     *
      * @param  array<string, scalar|array<mixed>|null>  $filters
      * @return \Generator<int, Thread>
      */
