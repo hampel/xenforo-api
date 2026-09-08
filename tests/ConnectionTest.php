@@ -11,11 +11,13 @@ use Hampel\XenForo\Api\Connection;
 use Hampel\XenForo\Api\Exception\ApiException;
 use Hampel\XenForo\Api\Exception\ClientException;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
+use Hampel\XenForo\Api\Exception\MalformedResponseException;
 use Hampel\XenForo\Api\Exception\NotAuthenticatedException;
 use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Exception\NotPermittedException;
 use Hampel\XenForo\Api\Exception\RequestException;
 use Hampel\XenForo\Api\Exception\ServerException;
+use Hampel\XenForo\Api\Exception\TooManyRequestsException;
 use Hampel\XenForo\Api\Upload;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -394,6 +396,80 @@ final class ConnectionTest extends TestCase
             $this->assertSame([], $e->errors());
             $this->assertStringContainsString('Bad gateway.', $e->getMessage());
             $this->assertLessThan(400, strlen($e->getMessage()));
+        }
+    }
+
+    /**
+     * The forum is not the only thing that answers on its URL. A maintenance page, a WAF
+     * challenge and a CDN interstitial are all a 200 with HTML in it, and a truncated
+     * response is a 200 with nothing. Decoded as an empty body every one of them would
+     * reach the caller as "no such record" - the failure shape this package is otherwise
+     * built to keep visible, one layer down from where apiFind() guards it.
+     *
+     * Reported by the package's first consumer, against forums behind Cloudflare.
+     */
+    #[DataProvider('nonJsonSuccesses')]
+    public function test_a_successful_status_that_is_not_json_raises_rather_than_reading_as_nothing(
+        string $body,
+        string $contentType,
+    ): void {
+        $this->client->pushRaw(200, $body, $contentType === '' ? [] : ['Content-Type' => $contentType]);
+
+        try {
+            $this->connection()->get('users/1/');
+
+            $this->fail('A 200 that is not JSON should have raised.');
+        } catch (MalformedResponseException $e) {
+            $this->assertInstanceOf(ApiException::class, $e, 'Catching ApiException must be enough to see it.');
+            $this->assertSame(200, $e->statusCode);
+            $this->assertSame($body, $e->body);
+            $this->assertSame([], $e->errors(), 'There was no JSON to carry codes in.');
+            $this->assertStringContainsString('HTTP 200 but not with JSON', $e->getMessage());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function nonJsonSuccesses(): iterable
+    {
+        yield 'an HTML maintenance page' => ['<html><body>Down for maintenance</body></html>', 'text/html'];
+        yield 'an empty body claiming JSON' => ['', 'application/json'];
+        yield 'an empty body with no type at all' => ['', ''];
+        yield 'a JSON scalar, which is not an object' => ['true', 'application/json'];
+        yield 'a JSON string' => ['"unavailable"', 'application/json'];
+        yield 'truncated JSON' => ['{"user": {"user_id": 1, "usern', 'application/json'];
+    }
+
+    public function test_the_message_names_the_content_type_and_a_cut_of_the_body(): void
+    {
+        $this->client->pushRaw(200, str_repeat('<div>challenge</div>', 50), ['Content-Type' => 'text/html; charset=UTF-8']);
+
+        try {
+            $this->connection()->get('users/1/');
+        } catch (MalformedResponseException $e) {
+            $this->assertStringContainsString('(text/html; charset=UTF-8)', $e->getMessage());
+            $this->assertStringEndsWith('...', $e->getMessage());
+            $this->assertLessThan(400, strlen($e->getMessage()), 'An HTML page must not become the message.');
+        }
+    }
+
+    /**
+     * A rate limit is a 4xx that is nothing like the other 4xxs: the request was right and
+     * will succeed later. Its own type, under ClientException so nothing catching that
+     * misses it.
+     */
+    public function test_a_rate_limit_is_its_own_retryable_type(): void
+    {
+        $this->client->pushRaw(429, 'Too Many Requests', ['Content-Type' => 'text/plain', 'Retry-After' => '30']);
+
+        try {
+            $this->connection()->get('users/1/');
+
+            $this->fail('A 429 should have raised.');
+        } catch (TooManyRequestsException $e) {
+            $this->assertInstanceOf(ClientException::class, $e);
+            $this->assertSame(429, $e->statusCode);
         }
     }
 

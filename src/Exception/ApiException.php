@@ -63,6 +63,7 @@ abstract class ApiException extends XenForoException
             $status === 401 => new NotAuthenticatedException($message, $status, $errors, $body),
             $status === 403 => new NotPermittedException($message, $status, $errors, $body),
             $status === 404 => new NotFoundException($message, $status, $errors, $body),
+            $status === 429 => new TooManyRequestsException($message, $status, $errors, $body),
             $status >= 500 => new ServerException($message, $status, $errors, $body),
             default => new ClientException($message, $status, $errors, $body),
         };
