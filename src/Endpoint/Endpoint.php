@@ -206,6 +206,14 @@ abstract class Endpoint
      * page that claims a successor and then returns nothing stops the loop rather than
      * spinning on somebody else's bug.
      *
+     * A WALK IS A SAMPLE, NOT A SNAPSHOT. Each page is its own request against a list that
+     * can move between them, and XenForo sorts most lists by a date with no tiebreaker -
+     * threads by `last_post_date` alone - so items that share a second are ordered as
+     * MySQL pleases from one LIMIT to the next. Seen live: 27 threads seeded inside three
+     * seconds, thread 10 on both pages, thread 6 on neither. A caller who needs every item
+     * de-duplicates by id and expects a miss wherever many items share a timestamp - an
+     * import, a bulk move, a seed. Nothing on this side of the query can prevent it.
+     *
      * @template TItem
      * @param  callable(array<mixed>): TItem  $map
      * @param  array<string, scalar|array<mixed>|null>  $query
