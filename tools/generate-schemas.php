@@ -154,7 +154,7 @@ function renderClass(string $class, string $specName, array $schema, string $ver
          * forum has installed. Fields this spec does not describe - one an add-on added by
          * extending the entity's toApiResult() - are still available in \$raw.
          */
-        final class {$class}
+        final class {$class} implements \\JsonSerializable
         {
         {$body}    /**
              * The response data this entity was built from, exactly as it arrived.
@@ -177,6 +177,23 @@ function renderClass(string $class, string $specName, array $schema, string $ver
             public static function fromArray(array \$data): self
             {
                 return new self(\$data);
+            }
+
+            /**
+             * What json_encode() emits: the payload as it arrived, and nothing else.
+             *
+             * Not the typed fields. Every field here is nullable, so serialising them
+             * would render a field the credential was not allowed to see as null - and
+             * XenForo omits those rather than blanking them, a distinction this package
+             * keeps everywhere else. It would also drop any field an add-on added, which
+             * \$raw exists to keep. \$raw round-trips through fromArray(); the typed set
+             * does not.
+             *
+             * @return array<mixed>
+             */
+            public function jsonSerialize(): array
+            {
+                return \$this->raw;
             }
         }
 

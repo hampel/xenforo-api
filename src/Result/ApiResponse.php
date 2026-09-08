@@ -12,7 +12,7 @@ namespace Hampel\XenForo\Api\Result;
  * `->data` and mostly ignore the rest; an integration that cares whether the forum has
  * outgrown it reads `->meta`.
  */
-final class ApiResponse
+final class ApiResponse implements \JsonSerializable
 {
     /**
      * @param  array<mixed>  $data  the decoded JSON body, or [] for a 204
@@ -67,5 +67,16 @@ final class ApiResponse
     public function isSuccess(): bool
     {
         return ($this->data['success'] ?? true) !== false;
+    }
+
+    /**
+     * What json_encode() emits: the decoded body, exactly as the forum sent it. The status
+     * and the version headers are metadata about the exchange, not part of the answer.
+     *
+     * @return array<mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->data;
     }
 }

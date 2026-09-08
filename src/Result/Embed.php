@@ -13,7 +13,7 @@ use Hampel\XenForo\Api\Support\Cast;
  * Hand-written because oEmbed is not XenForo's shape: the fields are the specification's,
  * and there is no entity behind them.
  */
-final class Embed
+final class Embed implements \JsonSerializable
 {
     /**
      * @param  array<mixed>  $raw
@@ -49,5 +49,16 @@ final class Embed
             Cast::int($data['cache_age'] ?? null),
             $data,
         );
+    }
+
+    /**
+     * What json_encode() emits: the payload as it arrived. See the generated entities for
+     * why it is the raw payload and not the typed fields.
+     *
+     * @return array<mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->raw;
     }
 }

@@ -15,7 +15,7 @@ use Hampel\XenForo\Api\Support\Cast;
  * shape of the JSON. The JSON has three nested objects. Generating from it literally would
  * produce a class whose properties could never be filled.
  */
-final class SiteStats
+final class SiteStats implements \JsonSerializable
 {
     /**
      * @param  array<mixed>  $raw
@@ -77,5 +77,16 @@ final class SiteStats
     public function onlineGuestsShare(): float
     {
         return $this->onlineTotal > 0 ? $this->onlineGuests / $this->onlineTotal : 0.0;
+    }
+
+    /**
+     * What json_encode() emits: the payload as it arrived. See the generated entities for
+     * why it is the raw payload and not the typed fields.
+     *
+     * @return array<mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->raw;
     }
 }

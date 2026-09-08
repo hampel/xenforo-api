@@ -15,7 +15,7 @@ use Hampel\XenForo\Api\Support\Cast;
  * object. Generating from that literally would produce a class with unreachable
  * properties, so this one is written from the response.
  */
-final class SiteInfo
+final class SiteInfo implements \JsonSerializable
 {
     /**
      * @param  list<string>  $scopes
@@ -88,5 +88,16 @@ final class SiteInfo
         $id = (string) $this->versionId;
 
         return sprintf('%d.%d.%d', (int) $id[0], (int) substr($id, 1, 2), (int) substr($id, 3, 2));
+    }
+
+    /**
+     * What json_encode() emits: the payload as it arrived. See the generated entities for
+     * why it is the raw payload and not the typed fields.
+     *
+     * @return array<mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->raw;
     }
 }
