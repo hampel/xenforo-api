@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+1.1.0 (2026-09-09)
+------------------
 
 * The PSR-17 factories are optional on `Client`: when not given, Guzzle's, Nyholm's or
   Diactoros' is found automatically
