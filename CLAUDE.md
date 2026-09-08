@@ -94,9 +94,10 @@ something should say so.
 - **Three endpoints do not answer in JSON.** `attachments/{id}/data` returns the file on a
   200; the two thumbnail endpoints return a **301** whose `Location` is the whole output.
   `Connection::sendRaw()` is the path for those - it hands the response back undecoded and
-  treats a redirect as a success, where `send()` throws on one. Note the thumbnail
-  endpoints only work through a client that does not follow redirects; the same URLs are on
-  the `Attachment` entity, which is why the methods say to prefer that.
+  treats a redirect as a success, where `send()` throws on one. The thumbnail endpoints
+  need a client that does not follow redirects: Guzzle's PSR-18 `sendRequest()` hard-codes
+  `allow_redirects` off, so a plain Guzzle client is fine; Laravel's HTTP client follows
+  unless `withoutRedirecting()`. The same URLs are on the `Attachment` entity either way.
 - **A file is judged by its filename, not by its declared type.** `getFile()` builds its
   `\XF\Http\Upload` from the temporary file and the filename; the part's own Content-Type
   is read in one case only, a part named `blob`. So `Upload` defaults to

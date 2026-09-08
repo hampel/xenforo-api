@@ -264,9 +264,11 @@ against — `download($id, $key)` — for the same reason reading its record doe
 
 The two thumbnail endpoints answer with a **301** whose `Location` header is the entire
 output, so `thumbnailUrl()` and `retinaThumbnailUrl()` only work through an HTTP client that
-does not follow redirects, and a PSR-18 client is free to follow them — most do by default.
-Where the client has followed one there is no way to recover the URL from a PSR-7 response,
-and the methods say so rather than guess. **`$xf->attachments()->get($id)->thumbnail_url` is
+does not follow redirects. Guzzle's PSR-18 `sendRequest()` never does — it hard-codes
+`allow_redirects` off — so through a plain Guzzle client they work as they are. A transport
+built another way may follow (Laravel's HTTP client does, unless `withoutRedirecting()`),
+and then there is no way to recover the URL from a PSR-7 response; the methods say so
+rather than guess. **`$xf->attachments()->get($id)->thumbnail_url` is
 the same answer** out of a request you have probably already made, and it does not depend on
 how the client is configured; prefer it.
 

@@ -343,8 +343,11 @@ final class Connection
      * answers 304 to a conditional request, and the thumbnail endpoints answer 301 with the
      * image's URL in the Location header - that redirect IS the documented output, so
      * turning it into an exception the way send() does would discard the answer. Whether it
-     * ever reaches the caller depends on the injected client: a PSR-18 client is free to
-     * follow redirects, and most do by default.
+     * reaches the caller depends on the injected client. The PSR-18 interface is silent on
+     * redirects, but Guzzle's own sendRequest() hard-codes allow_redirects to false - so
+     * through the most common client the 301 arrives as-is. A transport built some other
+     * way can have followed it: Laravel's HTTP client goes through Guzzle's send(), which
+     * follows unless told not to.
      *
      * A 4xx or 5xx still throws. Those bodies are JSON even on these endpoints, because the
      * error is rendered by the API renderer rather than by the attachment view.

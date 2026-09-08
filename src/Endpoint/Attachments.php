@@ -147,9 +147,11 @@ final class Attachments extends Endpoint
      *
      * READ THIS BEFORE USING IT. The endpoint answers with a 301 whose Location header is
      * the whole of the output, so it only works through an HTTP client that does not follow
-     * redirects - and a PSR-18 client is free to, most doing so by default. Where the
-     * client has followed it there is no way to recover the URL from a PSR-7 response, and
-     * this throws rather than guess.
+     * redirects. Guzzle's PSR-18 sendRequest() never does - it hard-codes allow_redirects
+     * to false - so through a plain Guzzle client this works. A transport built some other
+     * way may have followed it (Laravel's HTTP client does, unless withoutRedirecting()),
+     * and then there is no way to recover the URL from a PSR-7 response; this throws rather
+     * than guess.
      *
      * `$xf->attachments()->get($id)->thumbnail_url` is the same answer out of a request you
      * have very likely already made, and it does not depend on how the client is
