@@ -37,6 +37,10 @@
         "phpstan/phpstan": "^2.1.22",
         "phpunit/phpunit": "^12.0"
     },
+    "suggest": {
+        "guzzlehttp/guzzle": "A PSR-18 client to send requests with; any implementation will do",
+        "guzzlehttp/psr7": "PSR-17 factories, found automatically when none are passed to Client - as are nyholm/psr7 and laminas/laminas-diactoros"
+    },
     "autoload": {
         "psr-4": {
             "Hampel\\XenForo\\Api\\": "src/"

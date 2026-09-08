@@ -37,6 +37,7 @@ use Hampel\XenForo\Api\Endpoint\Stats;
 use Hampel\XenForo\Api\Endpoint\Threads;
 use Hampel\XenForo\Api\Endpoint\Users;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
+use Hampel\XenForo\Api\Support\Psr17Discovery;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
@@ -82,14 +83,26 @@ final class Client
     /** @var array<class-string<Endpoint>, Endpoint> */
     private array $endpoints = [];
 
+    /**
+     * @param  RequestFactoryInterface|null  $requestFactory  PSR-17. Leave both null and the
+     *         package finds one - Guzzle's, Nyholm's or Diactoros', whichever is installed;
+     *         see Psr17Discovery. Pass them to choose, or when none of those is present.
+     */
     public function __construct(
         private readonly Config $config,
         private readonly Authentication $authentication,
         ClientInterface $client,
-        RequestFactoryInterface $requestFactory,
-        StreamFactoryInterface $streamFactory,
+        ?RequestFactoryInterface $requestFactory = null,
+        ?StreamFactoryInterface $streamFactory = null,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
+        if ($requestFactory === null || $streamFactory === null) {
+            [$foundRequest, $foundStream] = Psr17Discovery::find();
+
+            $requestFactory ??= $foundRequest;
+            $streamFactory ??= $foundStream;
+        }
+
         $this->connection = new Connection(
             $this->config,
             $this->authentication,
