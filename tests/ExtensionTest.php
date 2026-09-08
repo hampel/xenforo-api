@@ -59,9 +59,23 @@ final class ExtensionTest extends TestCase
             ],
         ]);
 
-        $urls = $this->xenforo()->endpoint(UserFindCriteria::class)->urlsFor('sim@example.com');
+        $found = $this->xenforo()->endpoint(UserFindCriteria::class)->find(['email' => 'sim@example.com']);
 
-        $this->assertSame('https://forum.example.com/members/sim.1/', $urls['public']);
+        $this->assertNotNull($found);
+        $this->assertSame(1, $found['user']->user_id);
+        $this->assertSame('https://forum.example.com/members/sim.1/', $found['urls']['public']);
+        $this->assertCount(1, $this->client->requests, 'The user and the URLs arrive together; a second request would be a design smell.');
+    }
+
+    /**
+     * apiFindResponse() keeps apiFind()'s 404 rule - a forum without the add-on, or no
+     * such user, both read as null.
+     */
+    public function test_the_whole_envelope_still_reads_a_404_as_nothing(): void
+    {
+        $this->client->pushError(404, [['code' => 'requested_page_not_found']]);
+
+        $this->assertNull($this->xenforo()->endpoint(UserFindCriteria::class)->find(['email' => 'nobody@example.com']));
     }
 
     /**

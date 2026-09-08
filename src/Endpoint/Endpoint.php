@@ -152,6 +152,27 @@ abstract class Endpoint
     }
 
     /**
+     * The same lookup, handing back the whole response rather than one mapped key.
+     *
+     * For the endpoint whose answer is an envelope. Core XenForo mostly answers with a
+     * single named object, which is what apiFind() is shaped for - but an add-on endpoint
+     * is free to put three things at the top level, and often does: a user AND the URLs to
+     * reach them by, a record AND the field it was matched on. Mapping one key would throw
+     * the rest away, and the rest is frequently the point. Same 404-to-null rule as
+     * apiFind(), same three indistinguishable causes.
+     *
+     * @param  array<string, scalar|array<mixed>|null>  $query
+     */
+    protected function apiFindResponse(string $path, array $query = []): ?ApiResponse
+    {
+        try {
+            return $this->apiGet($path, $query);
+        } catch (NotFoundException) {
+            return null;
+        }
+    }
+
+    /**
      * One page of a list endpoint.
      *
      * @template TItem
