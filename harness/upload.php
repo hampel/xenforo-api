@@ -53,6 +53,7 @@ use Hampel\XenForo\Api\Upload;
 
 require __DIR__ . '/lib/agent.php';
 require __DIR__ . '/lib/client.php';
+require __DIR__ . '/lib/content.php';
 
 $io->title('xenforo-api · upload');
 
@@ -93,41 +94,12 @@ $xf = harness_client($io);
 $io->value('forum', $xf->config()->baseUri);
 $io->line();
 
-/**
- * The smallest valid PNG: one transparent pixel. Real image data, because the forum
- * inspects the contents as well as the name, so a file of random bytes named .png would
- * fail question 3 for the wrong reason.
- */
-$png = base64_decode(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-);
+$png = harness_one_pixel_png();
 
 $stamp = gmdate('Ymd-His');
 
-// Resolving the forum is an ordinary read, and it happens before the block that has a
-// cleanup to run - so it can stop the exercise outright without stepping over a finally.
-// PHP does not run a finally on exit(), which is why every exit here is outside one.
-
-try {
-    $tree = $xf->nodes()->list();
-
-    $forums = array_values(array_filter(
-        $tree['nodes'],
-        static fn ($node): bool => $node->node_type_id === 'Forum'
-    ));
-
-    $nodeId = (int) (getenv('XENFORO_NODE_ID') ?: ($forums[0]->node_id ?? 0));
-} catch (ExceptionInterface $e) {
-    $io->error(sprintf('✗ could not read the node tree: %s', $e->getMessage()));
-
-    exit(1);
-}
-
-if ($nodeId === 0) {
-    $io->warn('No Forum node found and XENFORO_NODE_ID is not set - stopping here.');
-
-    exit(0);
-}
+// Before the block with a cleanup in it, because it exits rather than throws.
+$nodeId = harness_forum_node_id($xf, $io);
 
 $io->value('node_id', $nodeId);
 $io->line();

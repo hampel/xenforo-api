@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Exercise: prove against a real forum that a decorated Content-Type loses the request body.
+ * Exercise: prove against a real forum that a decorated Content-Type loses a DELETE body. Writes one attachment, removes it.
  *
  * This is the claim the whole package rests on and the one nothing local can settle.
  * Connection::FORM_CONTENT_TYPE is a factual assertion about somebody else's PHP:
@@ -11,26 +11,29 @@
  * header we send; it cannot assert what XenForo then does with it, because the stub is
  * built from the same belief the code is.
  *
- * HOW IT PROBES WITHOUT WRITING ANYTHING
+ * THE POST LEG probes without writing anything: POST auth/ with a login that cannot exist.
+ * A body that arrived is validated and rejected; a body that was lost is reported as a
+ * REQUIRED INPUT missing. Both content types are sent, and both should arrive - PHP parses
+ * a POST body itself and ignores the parameter - which is the control.
  *
- * POST auth/ with a login that cannot exist. The two outcomes are distinguishable and
- * neither creates, changes or deletes a thing:
+ * THE DELETE LEG NEEDS A RECORD OF ITS OWN, and the first version of this exercise did not
+ * understand that. It sent DELETE auth/, which has no DELETE action; both legs answered 404
+ * endpoint_not_found before any input was parsed; and the exercise, seeing no
+ * required_input_missing on either, concluded that XenForo no longer compared the header
+ * exactly. It had tested nothing and reported a finding. A 404 on either leg now means
+ * "nothing was tested" and says so.
  *
- *   body arrived  -> XenForo validates the login and rejects it
- *   body lost     -> XenForo never sees `login` at all and reports a REQUIRED INPUT missing
+ * What it does instead: XenForo's own DELETEs take their arguments as QUERY parameters, so
+ * a body on one is only ever read through convertCustomMethodPhpInput() - and every core
+ * DELETE looks its record up before reading any input, so a nonexistent record cannot
+ * probe it. So the exercise uploads one attachment against a key and sends
+ * DELETE attachments/{id}/ with that key in the BODY, twice. Decorated first: the key is
+ * lost, assertViewableAttachment() sees an unassociated attachment with no key, answers
+ * 403, and the attachment survives. Then bare: the key arrives, the delete succeeds, 200.
+ * That order is load-bearing - the other way round the second leg has nothing to delete.
  *
- * The error code is the signal, and the second is the dangerous one - on a real endpoint it
- * would be a 200 that did nothing. Four requests go out: both content types on POST, where
- * PHP itself parses the body and the decoration should be harmless, and both on DELETE,
- * where XenForo parses it by hand and the decoration should be fatal. Printing all four
- * together is what makes the difference legible rather than asserted.
- *
- * NOT READ-ONLY IN ONE RESPECT: a rejected login is a login attempt, and a forum logs those
- * and rate-limits by IP. limit_ip is 0 here so the probe cannot lock anyone out, and the
- * username is random so there is no account to lock. Still, this points at a real forum -
- * hence the guard below.
- *
- * Needs XENFORO_URL and a SUPER-USER XENFORO_API_KEY (auth/ is super-user only).
+ * Needs XENFORO_URL and a SUPER-USER XENFORO_API_KEY (auth/ is super-user only), acting as
+ * a user who may manage attachments - XENFORO_API_USER. Nothing pre-existing is touched.
  * Set XENFORO_PROBE=1 to run it. Under an agent, XENFORO_AGENT_MAY_PROBE=1 as well, on the
  * command line and never in .env.
  *
@@ -39,11 +42,13 @@
 
 use GuzzleHttp\Client as Guzzle;
 use GuzzleHttp\Psr7\HttpFactory;
-use Hampel\XenForo\Api\Config;
 use Hampel\XenForo\Api\Connection;
+use Hampel\XenForo\Api\Exception\ExceptionInterface;
+use Hampel\XenForo\Api\Upload;
 
 require __DIR__ . '/lib/agent.php';
 require __DIR__ . '/lib/client.php';
+require __DIR__ . '/lib/content.php';
 
 $io->title('xenforo-api · encoding');
 
@@ -54,14 +59,14 @@ $io->title('xenforo-api · encoding');
  */
 $mode = static function (): array {
     if (getenv('XENFORO_PROBE') !== '1') {
-        return [false, 'refused - set XENFORO_PROBE=1 to send the four probe requests'];
+        return [false, 'refused - set XENFORO_PROBE=1 to send the six probe requests'];
     }
 
     if (harness_agent_refuses('XENFORO_AGENT_MAY_PROBE')) {
         return [false, 'refused - XENFORO_PROBE ignored in an agent session'];
     }
 
-    return [true, 'probing - four requests will reach the forum, none of which write anything'];
+    return [true, 'probing - four login attempts that cannot succeed, then one attachment up and down'];
 };
 
 [$proceed, $description] = $mode();
@@ -79,14 +84,10 @@ if (!$proceed) {
     exit(0);
 }
 
-$config = new Config(harness_forum_url($io));
-$key = getenv('XENFORO_API_KEY');
-
-if (!is_string($key) || $key === '') {
-    $io->error('XENFORO_API_KEY is not set. Copy .env.example to .env beside the package.');
-
-    exit(1);
-}
+$xf = harness_client($io);
+$config = $xf->config();
+$key = (string) getenv('XENFORO_API_KEY');
+$actingAs = getenv('XENFORO_API_USER');
 
 $io->value('forum', $config->baseUri);
 $io->line();
@@ -95,18 +96,23 @@ $guzzle = new Guzzle(['http_errors' => false]);
 $factory = new HttpFactory();
 
 $decorated = Connection::FORM_CONTENT_TYPE . '; charset=utf-8';
-$login = 'zzz-no-such-user-' . bin2hex(random_bytes(4));
-$body = http_build_query(['login' => $login, 'password' => 'not-a-password', 'limit_ip' => '0']);
 
 /**
+ * A raw request with the header under test written by hand, because the package would
+ * write it correctly and the point is to watch what an incorrect one does.
+ *
  * @return array{status: int, codes: list<string>, message: string}
  */
-$probe = static function (string $method, string $contentType) use ($guzzle, $factory, $config, $key, $body): array {
-    $request = $factory->createRequest($method, $config->resolve('auth/'))
+$probe = static function (string $method, string $path, string $contentType, string $body) use ($guzzle, $factory, $config, $key, $actingAs): array {
+    $request = $factory->createRequest($method, $config->resolve($path))
         ->withHeader('XF-Api-Key', $key)
         ->withHeader('Accept', 'application/json')
         ->withHeader('Content-Type', $contentType)
         ->withBody($factory->createStream($body));
+
+    if (is_string($actingAs) && ctype_digit($actingAs)) {
+        $request = $request->withHeader('XF-Api-User', $actingAs);
+    }
 
     $response = $guzzle->sendRequest($request);
     $decoded = json_decode((string) $response->getBody(), true);
@@ -124,35 +130,34 @@ $probe = static function (string $method, string $contentType) use ($guzzle, $fa
     return ['status' => $response->getStatusCode(), 'codes' => $codes, 'message' => $message];
 };
 
-$results = [
-    'POST bare' => $probe('POST', Connection::FORM_CONTENT_TYPE),
-    'POST decorated' => $probe('POST', $decorated),
-    'DELETE bare' => $probe('DELETE', Connection::FORM_CONTENT_TYPE),
-    'DELETE decorated' => $probe('DELETE', $decorated),
-];
-
-$lines = [];
-
-foreach ($results as $label => $result) {
-    $lines[$label] = sprintf(
-        '%d  [%s]  %s',
-        $result['status'],
-        $result['codes'] === [] ? '' : implode(', ', $result['codes']),
-        $result['message']
-    );
-}
-
-$io->values($lines);
-$io->line();
+/** @param array{status: int, codes: list<string>, message: string} $result */
+$line = static fn (array $result): string => sprintf(
+    '%d  [%s]  %s',
+    $result['status'],
+    implode(', ', $result['codes']),
+    $result['message']
+);
 
 // XenForo's "you did not send a required field" code. Its presence means the body was not
 // there to be read - which for a write endpoint would have been a 200 that did nothing.
 $lost = static fn (array $result): bool => in_array('required_input_missing', $result['codes'], true);
 
-$io->info('Reading the four:');
+// ---- POST: the control ----------------------------------------------------------------
+
+$login = 'zzz-no-such-user-' . bin2hex(random_bytes(4));
+$loginBody = http_build_query(['login' => $login, 'password' => 'not-a-password', 'limit_ip' => '0']);
+
+$post = [
+    'POST bare' => $probe('POST', 'auth/', Connection::FORM_CONTENT_TYPE, $loginBody),
+    'POST decorated' => $probe('POST', 'auth/', $decorated, $loginBody),
+];
+
+$io->info('POST auth/ with a login that cannot exist - the control:');
+$io->line();
+$io->values(array_map($line, $post));
 $io->line();
 
-if ($lost($results['POST bare'])) {
+if ($lost($post['POST bare'])) {
     $io->error('✗ Even a bare POST lost its body. Something more fundamental is wrong than the');
     $io->error('  Content-Type rule - check the URL reaches the API and not the forum front end.');
 
@@ -160,24 +165,105 @@ if ($lost($results['POST bare'])) {
 }
 
 $io->success('✓ POST bare        - body arrived, as it must for every write in this package');
-
-$io->line($lost($results['POST decorated'])
+$io->line($lost($post['POST decorated'])
     ? '  ! POST decorated   - body LOST. PHP is stricter here than expected; worth writing up.'
-    : '  ✓ POST decorated   - body arrived. Expected: PHP parses a POST body itself and ignores'
-    . PHP_EOL . '                       the charset parameter, so the decoration is harmless on POST.');
-
-$io->line();
-$io->info('The DELETE pair is the one that matters - XenForo parses those bodies by hand:');
+    : '  ✓ POST decorated   - body arrived. PHP parses a POST body itself and ignores the'
+    . PHP_EOL . '                       charset parameter, so the decoration is harmless on POST.');
 $io->line();
 
-if ($lost($results['DELETE decorated']) && !$lost($results['DELETE bare'])) {
-    $io->success('✓ The rule holds. A decorated Content-Type loses the body on DELETE and a bare one');
-    $io->success('  does not, which is exactly why Connection writes the header itself.');
-} elseif (!$lost($results['DELETE decorated']) && !$lost($results['DELETE bare'])) {
-    $io->warn('! Both DELETEs kept their body. XenForo no longer compares the header exactly,');
-    $io->warn('  or something in front of the forum is normalising it. Nothing breaks - the bare');
-    $io->warn('  header is still correct - but FORM_CONTENT_TYPE\'s docblock now overstates the');
-    $io->warn('  hazard and should be re-checked against the current XenForo source.');
+// ---- DELETE: the claim --------------------------------------------------------------
+
+// Before the block with a cleanup in it, because it exits rather than throws.
+$nodeId = harness_forum_node_id($xf, $io);
+
+$io->info('DELETE attachments/{id}/ with the key in the BODY - the claim:');
+$io->line();
+
+$attachmentId = null;
+$attachmentKey = null;
+$delete = [];
+$failure = null;
+$leaked = false;
+
+try {
+    $attachmentKey = $xf->attachments()->newKey('post', ['node_id' => $nodeId])['key'];
+
+    $uploaded = $xf->attachments()->upload(
+        $attachmentKey,
+        Upload::fromString(harness_one_pixel_png(), sprintf('xf-api-encoding-%s.png', gmdate('Ymd-His')))
+    );
+
+    $attachmentId = $uploaded->attachment_id;
+
+    if ($attachmentId === null) {
+        throw new \RuntimeException('the upload came back without an attachment_id');
+    }
+
+    $io->value('attachment', $attachmentId);
+    $io->line();
+
+    $deleteBody = http_build_query(['key' => $attachmentKey]);
+    $path = 'attachments/' . $attachmentId . '/';
+
+    // Decorated FIRST. It is the one expected to fail, and the attachment has to survive it
+    // for the bare leg to have anything to delete.
+    $delete = [
+        'DELETE decorated' => $probe('DELETE', $path, $decorated, $deleteBody),
+        'DELETE bare' => $probe('DELETE', $path, Connection::FORM_CONTENT_TYPE, $deleteBody),
+    ];
+
+    $io->values(array_map($line, $delete));
+    $io->line();
+} catch (ExceptionInterface $e) {
+    $failure = $e;
+
+    $io->error(sprintf('✗ %s', $e::class));
+    $io->error('  ' . $e->getMessage());
+} finally {
+    // The bare leg is supposed to have deleted it. Anything else, and it is still there.
+    $stillThere = $attachmentId !== null && ($delete['DELETE bare']['status'] ?? 0) !== 200;
+
+    if ($stillThere) {
+        try {
+            $xf->attachments()->delete($attachmentId, $attachmentKey);
+
+            $io->line(sprintf('  cleaned up attachment %d through the package', $attachmentId));
+        } catch (ExceptionInterface $cleanup) {
+            $leaked = true;
+
+            $io->error(sprintf('  ✗ CLEANUP FAILED for attachment %d - %s', $attachmentId, $cleanup::class));
+            $io->error('    Remove it by hand. It is unassociated, so the forum will also expire it.');
+        }
+    }
+}
+
+if ($failure !== null) {
+    exit(1);
+}
+
+$decoratedStatus = $delete['DELETE decorated']['status'] ?? 0;
+$bareStatus = $delete['DELETE bare']['status'] ?? 0;
+
+$io->info('Reading the pair:');
+$io->line();
+
+if ($decoratedStatus === 404 || $bareStatus === 404) {
+    // The mistake the first version of this exercise made, now named rather than misread.
+    $io->warn('! A 404 on a DELETE leg means the request never reached input parsing - the route');
+    $io->warn('  or the record was missing - so NOTHING WAS TESTED. This is not a result.');
+} elseif ($decoratedStatus === 403 && $bareStatus === 200) {
+    $io->success('✓ The rule holds. With a decorated Content-Type the key in the body was never read');
+    $io->success('  and the forum refused; with the bare one it was read and the delete went through.');
+    $io->success('  That is exactly why Connection writes the header itself.');
+} elseif ($decoratedStatus === 200) {
+    $io->warn('! The decorated DELETE succeeded, so its body WAS read. XenForo no longer compares');
+    $io->warn('  the header exactly, or something in front of the forum is normalising it. Nothing');
+    $io->warn('  breaks - the bare header is still correct - but FORM_CONTENT_TYPE\'s docblock now');
+    $io->warn('  overstates the hazard and should be re-checked against the current XenForo source.');
 } else {
-    $io->warn('! Neither outcome this exercise knows about. Read the four lines above directly.');
+    $io->warn('! Neither outcome this exercise knows about. Read the two lines above directly.');
+}
+
+if ($leaked) {
+    exit(1);
 }

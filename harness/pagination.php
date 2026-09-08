@@ -23,32 +23,33 @@
  * Probes are issued raw, with http_errors off, rather than through the package: the status
  * codes and error codes ARE the answer here, and this package turns them into exceptions.
  *
- * Needs XENFORO_URL and XENFORO_API_KEY. Reads users/ by default, which every forum has;
- * set XENFORO_PAGINATION_PATH to probe another list endpoint - an add-on's, for instance -
- * and XENFORO_PAGINATION_KEY to name the list it returns.
+ * Needs XENFORO_URL and XENFORO_API_KEY. Reads threads/ by default, which every forum
+ * allows - users/ looks like the obvious choice and is not, because the member list is an
+ * option (enableMemberList) that answers 403 for everyone when it is off. Set
+ * XENFORO_PAGINATION_PATH to probe another list endpoint - an add-on's, for instance - and
+ * XENFORO_PAGINATION_KEY to name the list it returns.
  *
  * @var Hampel\Rig\Io $io
  */
 
 use GuzzleHttp\Client as Guzzle;
 use GuzzleHttp\Psr7\HttpFactory;
-use Hampel\XenForo\Api\Config;
 
 require __DIR__ . '/lib/client.php';
+require __DIR__ . '/lib/content.php';
 
 $io->title('xenforo-api · pagination');
 
-$config = new Config(harness_forum_url($io));
-$key = getenv('XENFORO_API_KEY');
+$xf = harness_client($io);
+$config = $xf->config();
+$key = (string) getenv('XENFORO_API_KEY');
+$actingAs = getenv('XENFORO_API_USER');
 
-if (!is_string($key) || $key === '') {
-    $io->error('XENFORO_API_KEY is not set. Copy .env.example to .env beside the package.');
-
-    exit(1);
-}
-
-$path = getenv('XENFORO_PAGINATION_PATH') ?: 'users/';
-$listKey = getenv('XENFORO_PAGINATION_KEY') ?: 'users';
+// A forum's own thread list, not the global threads/ - which quietly applies a
+// last-activity cutoff when unfiltered and answers 200 with total 0 on a quiet forum, so
+// the probe would be comparing pages of nothing. The per-forum list applies no cutoff.
+$path = getenv('XENFORO_PAGINATION_PATH') ?: 'forums/' . harness_forum_node_id($xf, $io) . '/threads';
+$listKey = getenv('XENFORO_PAGINATION_KEY') ?: 'threads';
 
 $guzzle = new Guzzle(['http_errors' => false]);
 $factory = new HttpFactory();
@@ -56,10 +57,14 @@ $factory = new HttpFactory();
 /**
  * @return array{status: int, body: array<mixed>}
  */
-$probe = static function (int $page) use ($guzzle, $factory, $config, $key, $path): array {
+$probe = static function (int $page) use ($guzzle, $factory, $config, $key, $path, $actingAs): array {
     $request = $factory->createRequest('GET', $config->resolve($path, ['page' => $page]))
         ->withHeader('XF-Api-Key', $key)
         ->withHeader('Accept', 'application/json');
+
+    if (is_string($actingAs) && ctype_digit($actingAs)) {
+        $request = $request->withHeader('XF-Api-User', $actingAs);
+    }
 
     $response = $guzzle->sendRequest($request);
     $decoded = json_decode((string) $response->getBody(), true);
@@ -102,32 +107,93 @@ $io->line();
 $io->info('Is `page` honoured?');
 
 $firstList = is_array($first['body'][$listKey] ?? null) ? $first['body'][$listKey] : [];
-$identify = static fn (array $list): string => json_encode(reset($list) ?: null) === false
-    ? '(unreadable)'
-    : substr((string) json_encode(reset($list) ?: null), 0, 60);
 
-if ($lastPage < 2) {
+/**
+ * Something that names each item and differs between items. The first `*_id` field on it,
+ * which every XenForo entity has - NOT a prefix of its JSON, which begins with `can_edit`
+ * and the other permission booleans and reads identically for every thread on the forum.
+ * The first version of this exercise compared such a prefix and reported `page` as
+ * ignored on a forum where it was working; the fingerprint has to be the thing that is
+ * unique, not the thing that comes first.
+ */
+// The item's own id: `thread_id` on a list called `threads`, and so on. Falls back to the
+// first `*_id` field, which on a thread is first_post_id - unique too, just less readable.
+$idField = rtrim($listKey, 's') . '_id';
+
+/** @return string|null one item's id, or null if it has none */
+$idOf = static function (mixed $item) use ($idField): ?string {
+    if (!is_array($item)) {
+        return null;
+    }
+
+    if (isset($item[$idField]) && is_scalar($item[$idField])) {
+        return (string) $item[$idField];
+    }
+
+    foreach ($item as $field => $value) {
+        if (is_string($field) && str_ends_with($field, '_id') && is_scalar($value)) {
+            return (string) $value;
+        }
+    }
+
+    return null;
+};
+
+$identify = static function (array $list) use ($idOf, $idField): string {
+    $item = reset($list);
+
+    if ($item === false) {
+        return '(empty)';
+    }
+
+    return ($idOf($item) === null) ? 'md5:' . md5((string) json_encode($item)) : $idField . '=' . $idOf($item);
+};
+
+/** @return list<string> the ids on a page, in the order the forum sent them */
+$ids = static fn (array $list): array => array_values(array_filter(array_map($idOf, $list), is_string(...)));
+
+if ($lastPage < 1) {
+    $io->warn('The list is empty, so neither question can be asked of it. If this is the default');
+    $io->warn('target, the forum has no threads; the write exercise can give it some.');
+} elseif ($lastPage < 2) {
     $io->warn('Only one page of results, so this cannot be probed here.');
-    $io->warn('Point XENFORO_PAGINATION_PATH at a longer list to answer it.');
+    $io->warn('Point XENFORO_PAGINATION_PATH at a longer list, or seed one with the write exercise.');
 } else {
     $second = $probe(2);
     $secondList = is_array($second['body'][$listKey] ?? null) ? $second['body'][$listKey] : [];
     $secondPagination = is_array($second['body']['pagination'] ?? null) ? $second['body']['pagination'] : [];
+
+    $overlap = array_intersect($ids($firstList), $ids($secondList));
 
     $io->values([
         'page 1 current_page' => $pagination['current_page'] ?? '(absent)',
         'page 2 current_page' => $secondPagination['current_page'] ?? '(absent)',
         'page 1 first item' => $identify($firstList),
         'page 2 first item' => $identify($secondList),
+        'page 1 ids' => implode(', ', $ids($firstList)),
+        'page 2 ids' => implode(', ', $ids($secondList)),
+        'ids on both pages' => $overlap === [] ? '(none - as it should be)' : implode(', ', $overlap),
     ]);
 
     $io->line();
 
-    if ($identify($firstList) === $identify($secondList)) {
-        $io->error('✗ Both pages returned the same first item. `page` is not being honoured.');
+    if ($ids($firstList) === $ids($secondList)) {
+        $io->error('✗ Both pages returned the same items. `page` is not being honoured.');
         $io->error('  Every paginated read in this package would silently return page 1 forever.');
+    } elseif ($overlap !== []) {
+        // Not the same failure, and the first version of this exercise reported it as one.
+        // `page` is honoured - the pages differ - but an item is on both, which means
+        // another is on neither. XenForo's thread list sorts by last_post_date with no
+        // tiebreaker, and MySQL does not promise a stable order among ties across LIMIT
+        // pages; enough threads sharing a second - a seed, an import, a bulk move - and a
+        // walk repeats one and skips one. each() cannot see this. A caller who needs every
+        // item de-duplicates by id and knows the walk is a sample, not a snapshot.
+        $io->warn('! `page` is honoured, but the pages OVERLAP: an item is on both, so another is on');
+        $io->warn('  neither. The sort key has ties and no tiebreaker, and MySQL orders ties as it');
+        $io->warn('  likes from one LIMIT to the next. A walk over this list is a sample, not a');
+        $io->warn('  snapshot - de-duplicate by id, and expect a miss when many items share a second.');
     } else {
-        $io->success('✓ the two pages differ, so `page` is honoured');
+        $io->success('✓ the two pages differ and share nothing, so `page` is honoured and the walk is stable');
     }
 }
 
@@ -135,6 +201,12 @@ if ($lastPage < 2) {
 
 $io->line();
 $io->info('Does a page past the end error, rather than returning nothing?');
+
+if ($lastPage < 1) {
+    $io->warn('An empty list has no end to go past - page 1 of nothing is valid, not beyond.');
+
+    exit(0);
+}
 
 $beyond = $probe($lastPage + 1);
 $codes = [];

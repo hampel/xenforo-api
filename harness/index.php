@@ -15,6 +15,7 @@
  */
 
 use Hampel\XenForo\Api\Exception\ExceptionInterface;
+use Hampel\XenForo\Api\Result\SiteInfo;
 
 require __DIR__ . '/lib/client.php';
 
@@ -29,7 +30,11 @@ $io->values([
 $io->line();
 
 try {
-    $info = $xf->index()->get();
+    // Through the connection rather than index()->get(), because the acting user is not in
+    // the body at all - it is the XF-Request-User response header, which only the
+    // connection-level response carries.
+    $response = $xf->connection()->get('index/');
+    $info = SiteInfo::fromArray($response->data);
 } catch (ExceptionInterface $e) {
     $io->error('✗ ' . $e::class);
     $io->error($e->getMessage());
@@ -43,7 +48,10 @@ $io->values([
     'api url' => $info->apiUrl,
     'version' => $info->version() . ' (' . $info->versionId . ')',
     'key type' => $info->keyType,
-    'key user_id' => $info->keyUserId ?? '(none - acting as guest)',
+    // A user key names its user here; a super key has no fixed user and never will, so an
+    // empty value on one says nothing about who the request acted as - that is below.
+    'key user_id' => $info->keyUserId ?? ($info->keyType === 'super' ? '(none - a super key has no fixed user)' : '(none)'),
+    'acting as' => $response->meta->requestUser === null ? 'guest' : 'user ' . $response->meta->requestUser,
     'all scopes' => $info->allowAllScopes ? 'yes' : 'no',
     'scopes' => $info->scopes === [] ? '(none listed)' : implode(', ', $info->scopes),
 ]);
