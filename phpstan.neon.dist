@@ -1,6 +1,16 @@
 parameters:
     level: 8
 
+    # PHPDoc types are inference here, not certainty. This is a library whose public
+    # methods take docblock-typed arguments - class-string<T>, array<string, Upload> - from
+    # consumers who may run no static analysis at all, so it checks them at runtime and
+    # raises its own exception rather than letting a TypeError or a ReflectionException
+    # escape. With this true (the default) PHPStan reports those guards as dead code, and
+    # which guards it reports differs between releases: 2.1.22, the floor of the declared
+    # constraint and what --prefer-lowest installs, flags Client::endpoint()'s
+    # is_subclass_of() where the current release does not. The guards are the point.
+    treatPhpDocTypesAsCertain: false
+
     paths:
         - src
         - tests
