@@ -25,7 +25,23 @@ final class ApiResponse
     }
 
     /**
-     * One top-level key of the body.
+     * Whether the body carried this key at all - which for this API is a different question
+     * from whether it carried a value, and the one that matters more.
+     *
+     * XenForo builds a result with includeColumn(): a field the credential may not see is
+     * OMITTED, not sent as null. `email`, `user_state`, `user_group_id` and `is_banned` on a
+     * user all behave this way. So an absent key means "you were not allowed to know", which
+     * is usually a configuration error in the caller's credential, and a present null means
+     * "there is nothing" - and value() with a default cannot tell them apart. This can.
+     */
+    public function has(string $key): bool
+    {
+        return array_key_exists($key, $this->data);
+    }
+
+    /**
+     * One top-level key of the body, or the default when it is absent OR null. Where the
+     * difference matters - and see has() for why here it often does - ask has() first.
      */
     public function value(string $key, mixed $default = null): mixed
     {
