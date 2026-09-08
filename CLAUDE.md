@@ -125,8 +125,24 @@ something should say so.
   with `includeColumn()`, so `email`, `user_state`, `user_group_id` and `is_banned` are
   absent from the JSON rather than null when the key lacks the standing.
   `ApiResponse::has()` is how to tell; `value()` with a default cannot.
+- **A missing route and a missing record are different 404s.** `requested_page_not_found`
+  is a record (or, on some controllers, one the acting user may not see);
+  `endpoint_not_found` is a path or action the forum does not have - in 2.2 and 2.3 alike.
+  `apiFind()` returns null for the first and raises `EndpointNotFoundException` for the
+  second, because an add-on endpoint on a forum without the add-on is configuration, not
+  absence. Measured live on 2.3.12.
 - **Read the error code, not the status.** XenForo answers 400 for most caller mistakes -
   a missing input, a validation failure, a page past the end.
+- **`GET threads/` is the recently-active list, not the thread list.** Unfiltered and
+  under the default sort, `ThreadsController::setupThreadFinder()` adds
+  `last_post_date > getReadMarkingCutOff()` - the read-marking window, 30 days by default -
+  and answers 200 with `total: 0` on a quiet forum. `forums/{id}/threads` applies no
+  cutoff. Found live, on a forum whose two threads were older than the window.
+- **A page walk can repeat and skip items.** XenForo sorts most lists by a date with no
+  tiebreaker - `applyThreadListSort()` orders by `last_post_date` alone - and MySQL orders
+  ties as it likes across `LIMIT` pages. Seen live after seeding 25 threads in three
+  seconds: thread 10 on both pages, thread 6 on neither. `apiEach()` cannot see it;
+  de-duplicate by id where completeness matters. The `pagination` exercise reports it.
 - **A page past the last one is an error, not an empty page.** `assertValidApiPage()`
   throws `invalid_page`, so "fetch until it comes back empty" ends in an exception.
 - **Every response carries `XF-Used-Api-Version` and `XF-Latest-Api-Version`.** They are
@@ -145,8 +161,9 @@ something should say so.
 
 `vendor/bin/rig` lists the exercises. `index`, `read` and `pagination` are read-only.
 
-`encoding` sends four requests to a real forum, none of which write anything - but a
-rejected login is still a login attempt, so it is opt-in:
+`encoding` sends six requests to a real forum: four login attempts that cannot succeed,
+and one attachment it uploads and then deletes through the header under test. Nothing
+pre-existing is touched, but it writes, so it is opt-in:
 
 ```bash
 XENFORO_PROBE=1 vendor/bin/rig encoding
@@ -160,9 +177,18 @@ package builds and returns the same bytes through the download path.
 XENFORO_UPLOAD=1 vendor/bin/rig upload
 ```
 
-Under an agent both refuse even then, unless `XENFORO_AGENT_MAY_PROBE=1` or
-`XENFORO_AGENT_MAY_UPLOAD=1` is also set - on the command line, for one run, never in
-`.env`. See `harness/lib/agent.php`.
+`write` creates content and leaves it - a thread, replies, a reaction, an edit, and with
+`XENFORO_WRITE_USER=1` a user who posts the replies, which is the live test of
+`actingAs()`. `XENFORO_WRITE_THREADS=25` seeds enough for `pagination` to have a second
+page. It never deletes anything, and it is for a development forum only:
+
+```bash
+XENFORO_WRITE=1 XENFORO_WRITE_USER=1 XENFORO_WRITE_THREADS=25 vendor/bin/rig write
+```
+
+Under an agent all three refuse even then, unless `XENFORO_AGENT_MAY_PROBE=1`,
+`XENFORO_AGENT_MAY_UPLOAD=1` or `XENFORO_AGENT_MAY_WRITE=1` is also set - on the command
+line, for one run, never in `.env`. See `harness/lib/agent.php`.
 
 **If an exercise fails for want of a credential, that is the guard working.** The rig does
 not load `.env` in an agent session. Do not go looking for the key.

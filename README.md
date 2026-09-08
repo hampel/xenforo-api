@@ -187,6 +187,11 @@ Use it rather than writing the loop by hand. **Asking XenForo for a page past th
 is an error, not an empty result** — `invalid_page`, HTTP 400 — so the obvious "fetch until
 it comes back empty" ends every complete traversal in an exception.
 
+One thing a walk cannot promise is **completeness under ties**. XenForo sorts most lists by
+a date with no tiebreaker, so where many items share a second — an import, a bulk move —
+MySQL's order among them shifts between pages, and a walk can return one item twice and
+another not at all. De-duplicate by id where it matters.
+
 ## Uploading files
 
 Attachments, avatars and featured-content images are sent as `multipart/form-data`, and an
@@ -322,7 +327,8 @@ try {
 The hierarchy is `RuntimeException` → `XenForoException` → `ApiException` →
 `ClientException` (4xx) or `ServerException` (5xx), with `NotAuthenticatedException` (401),
 `NotPermittedException` (403), `NotFoundException` (404) and `TooManyRequestsException`
-(429) under `ClientException`. Every one of them implements `ExceptionInterface`, so a
+(429) under `ClientException`, and `EndpointNotFoundException` under `NotFoundException`
+for the 404 that means the route is missing rather than the record. Every one of them implements `ExceptionInterface`, so a
 consumer can catch the package's failures with one clause and let everything else through.
 
 **An unusable key and a missing record are different exceptions**, which is the reason to
@@ -369,7 +375,7 @@ final class UserFindCriteria extends Endpoint
         $response = $this->apiFindResponse('users/find-criteria', ['email' => $email]);
 
         if ($response === null) {
-            return null;                                  // 404: no such user, or no such add-on
+            return null;                                  // 404: no such user
         }
 
         return [
@@ -386,6 +392,12 @@ $xf->endpoint(UserFindCriteria::class)->byEmail('someone@example.com');
 which is most of core XenForo; it maps that one key and discards the rest, so on an
 envelope it is the wrong tool. `tests/Fixture/UserFindCriteria.php` is the complete version
 of the class above.
+
+Both read a 404 as `null` **only when it is the record that is missing.** XenForo marks a
+missing *route* — this add-on on a forum that does not have it — with a different code,
+`endpoint_not_found`, and that arrives as `EndpointNotFoundException` instead of `null`: a
+forum without the add-on is a configuration problem, and it must not look like a user who
+does not exist.
 
 There is nothing to register, no container and no string keys — the class *is* the
 registration, so a third party can ship one in its own package and a consumer's static
@@ -435,6 +447,10 @@ nothing is ever lost for not being in a specification.
 - **A file is judged by its filename, not by the type it declares.** XenForo reads the
   part's own `Content-Type` in exactly one case — a part named `blob`, where it invents an
   extension for a file the browser did not name.
+- **`threads()->list()` is the recently-active list.** Unfiltered, XenForo restricts the
+  global thread list to threads with activity inside its read-marking window — 30 days by
+  default — and answers `200` with `total: 0` on a quiet forum. Pass `last_days`, or read
+  a forum's own list with `forums()->threads($nodeId)`, which has no cutoff.
 - **A missing API key is not a 401.** XenForo treats it as a guest and carries on, so
   unauthenticated endpoints answer normally.
 - **Every response carries `XF-Used-Api-Version` and `XF-Latest-Api-Version`**, reachable on
