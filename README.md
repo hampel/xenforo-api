@@ -75,7 +75,7 @@ $info->hasScope('user:write');
 | `featured()` `stats()` `oembed()` | featured content, site statistics, oEmbed for a URL |
 | `oauth2()` | the token endpoints: exchange, refresh, introspect, revoke |
 | `media()` `mediaAlbums()` `mediaCategories()` `mediaComments()` | XenForo Media Gallery |
-| `resourceItems()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
+| `resources()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
 
 Coverage is checked in both directions by `SpecConformanceTest`: every path an endpoint
 class calls exists in the specification, and every endpoint the specification describes is
