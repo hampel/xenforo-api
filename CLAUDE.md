@@ -9,7 +9,7 @@ because on a real forum they are not.
 ```bash
 composer check          # lint, analyse, test - what CI runs
 composer test           # phpunit
-composer analyse        # phpstan, level 8, PHP 8.3-8.5 in one pass
+composer analyse        # phpstan, level 9, PHP 8.3-8.5 in one pass
 composer format         # pint
 composer generate       # regenerate src/Generated/Schema from resources/openapi.json
 ```

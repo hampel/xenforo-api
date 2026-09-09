@@ -37,13 +37,15 @@ $targetDir = $root . '/src/Generated/Schema';
 
 $spec = json_decode((string) file_get_contents($specFile), true, 512, JSON_THROW_ON_ERROR);
 
-if (!is_array($spec) || !isset($spec['components']['schemas']) || !is_array($spec['components']['schemas'])) {
+$components = is_array($spec) ? ($spec['components'] ?? null) : null;
+$schemas = is_array($components) ? ($components['schemas'] ?? null) : null;
+
+if (!is_array($spec) || !is_array($schemas)) {
     fwrite(STDERR, "No components.schemas in {$specFile}\n");
     exit(1);
 }
 
 /** @var array<string, array<mixed>> $schemas */
-$schemas = $spec['components']['schemas'];
 
 if (!is_dir($targetDir) && !mkdir($targetDir, 0o755, true)) {
     fwrite(STDERR, "Could not create {$targetDir}\n");
@@ -56,7 +58,8 @@ foreach (glob($targetDir . '/*.php') ?: [] as $existing) {
     unlink($existing);
 }
 
-$version = is_string($spec['info']['version'] ?? null) ? $spec['info']['version'] : '?';
+$info = $spec['info'] ?? null;
+$version = is_array($info) && is_string($info['version'] ?? null) ? $info['version'] : '?';
 $count = 0;
 
 foreach ($schemas as $name => $schema) {

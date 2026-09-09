@@ -41,7 +41,7 @@ final class SpecConformanceTest extends BaseTestCase
     #[DataProvider('endpoints')]
     public function test_the_endpoint_exists_in_the_specification(string $method, string $path, string $file): void
     {
-        $paths = self::spec()['paths'];
+        $paths = self::paths();
 
         $this->assertArrayHasKey($path, $paths, sprintf(
             '%s calls %s, which is not a path in the XenForo API specification.',
@@ -79,8 +79,7 @@ final class SpecConformanceTest extends BaseTestCase
 
         $missing = [];
 
-        /** @var array<string, array<mixed>> $paths */
-        $paths = self::spec()['paths'];
+        $paths = self::paths();
 
         foreach ($paths as $path => $operations) {
             foreach ($operations as $method => $operation) {
@@ -132,6 +131,30 @@ final class SpecConformanceTest extends BaseTestCase
 
         /** @var array<mixed> $spec */
         return $spec;
+    }
+
+    /**
+     * The specification's paths block, narrowed once: a path name to its operations.
+     *
+     * @return array<string, array<mixed>>
+     */
+    private static function paths(): array
+    {
+        $paths = self::spec()['paths'] ?? null;
+
+        if (!is_array($paths)) {
+            throw new \LogicException('The specification has no paths block.');
+        }
+
+        $narrowed = [];
+
+        foreach ($paths as $path => $operations) {
+            if (is_string($path) && is_array($operations)) {
+                $narrowed[$path] = $operations;
+            }
+        }
+
+        return $narrowed;
     }
 
     /**

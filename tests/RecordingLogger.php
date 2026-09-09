@@ -22,7 +22,7 @@ final class RecordingLogger extends AbstractLogger
     public function log($level, $message, array $context = []): void
     {
         $this->records[] = [
-            'level' => (string) $level,
+            'level' => is_scalar($level) || $level instanceof \Stringable ? (string) $level : get_debug_type($level),
             'message' => (string) $message,
             'context' => $context,
         ];

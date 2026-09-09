@@ -64,8 +64,8 @@ final class Payload
      * would otherwise drop `false` to an empty string, which XenForo reads as false too,
      * but only by accident.
      *
-     * @param  array<mixed>  $payload
-     * @return array<mixed>
+     * @param  array<array-key, mixed>  $payload
+     * @return array<array-key, scalar|array<mixed>>
      */
     public static function normalise(array $payload): array
     {

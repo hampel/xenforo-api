@@ -8,6 +8,7 @@ use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Exception\RuntimeException;
 use Hampel\XenForo\Api\Generated\Schema\Attachment;
 use Hampel\XenForo\Api\Result\Download;
+use Hampel\XenForo\Api\Support\Cast;
 use Hampel\XenForo\Api\Upload;
 use Psr\Http\Message\ResponseInterface;
 
@@ -105,7 +106,7 @@ final class Attachments extends Endpoint
         $uploaded = $response->array('attachment');
 
         return [
-            'key' => (string) $response->value('key', ''),
+            'key' => Cast::string($response->value('key')) ?? '',
             'attachment' => $uploaded === [] ? null : Attachment::fromArray($uploaded),
         ];
     }

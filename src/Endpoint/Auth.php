@@ -6,6 +6,7 @@ namespace Hampel\XenForo\Api\Endpoint;
 
 use Hampel\XenForo\Api\Exception\ClientException;
 use Hampel\XenForo\Api\Generated\Schema\User;
+use Hampel\XenForo\Api\Support\Cast;
 
 /**
  * Auth - validating a member's credentials, and handing them a session.
@@ -88,9 +89,9 @@ final class Auth extends Endpoint
         $response = $this->apiPost('auth/login-token', ['user_id' => $userId] + $options);
 
         return [
-            'login_token' => (string) $response->value('login_token', ''),
-            'login_url' => (string) $response->value('login_url', ''),
-            'expiry_date' => (int) $response->value('expiry_date', 0),
+            'login_token' => Cast::string($response->value('login_token')) ?? '',
+            'login_url' => Cast::string($response->value('login_url')) ?? '',
+            'expiry_date' => Cast::int($response->value('expiry_date')) ?? 0,
         ];
     }
 }

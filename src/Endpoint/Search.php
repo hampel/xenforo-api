@@ -56,9 +56,21 @@ final class Search extends Endpoint
         return $this->apiPaginate(
             'search/' . $searchId . '/',
             'results',
-            static fn (array $result): array => $result,
+            self::asIs(...),
             $page
         );
+    }
+
+    /**
+     * The identity, as a mapper. Named rather than inlined so its types are declared where
+     * static analysis reads them; an arrow function in argument position loses them.
+     *
+     * @param  array<mixed>  $result
+     * @return array<mixed>
+     */
+    private static function asIs(array $result): array
+    {
+        return $result;
     }
 
     /**

@@ -1,5 +1,5 @@
 parameters:
-    level: 8
+    level: 9
 
     # PHPDoc types are inference here, not certainty. This is a library whose public
     # methods take docblock-typed arguments - class-string<T>, array<string, Upload> - from

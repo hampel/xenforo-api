@@ -39,7 +39,7 @@ final class JsonSerializationTest extends BaseTestCase
         $user = User::fromArray(self::PAYLOAD);
 
         $this->assertSame(json_encode(self::PAYLOAD), json_encode($user));
-        $this->assertCount(7, json_decode((string) json_encode($user), true));
+        $this->assertCount(7, self::encoded($user));
     }
 
     /**
@@ -49,7 +49,7 @@ final class JsonSerializationTest extends BaseTestCase
      */
     public function test_a_field_the_credential_could_not_see_stays_absent(): void
     {
-        $encoded = json_decode((string) json_encode(User::fromArray(self::PAYLOAD)), true);
+        $encoded = self::encoded(User::fromArray(self::PAYLOAD));
 
         $this->assertArrayNotHasKey('email', $encoded);
         $this->assertArrayNotHasKey('user_state', $encoded);
@@ -58,7 +58,7 @@ final class JsonSerializationTest extends BaseTestCase
 
     public function test_an_add_on_field_survives(): void
     {
-        $encoded = json_decode((string) json_encode(User::fromArray(self::PAYLOAD)), true);
+        $encoded = self::encoded(User::fromArray(self::PAYLOAD));
 
         $this->assertSame('kept', $encoded['custom_addon_field']);
     }
@@ -73,10 +73,26 @@ final class JsonSerializationTest extends BaseTestCase
     {
         $user = User::fromArray(self::PAYLOAD);
 
-        $rebuilt = User::fromArray(json_decode((string) json_encode($user), true));
+        $rebuilt = User::fromArray(self::encoded($user));
 
         $this->assertEquals($user, $rebuilt);
         $this->assertSame($user->raw, $rebuilt->raw);
+    }
+
+    /**
+     * json_encode() and back, narrowed once to the array it must be.
+     *
+     * @return array<mixed>
+     */
+    private static function encoded(object $value): array
+    {
+        $decoded = json_decode((string) json_encode($value), true);
+
+        if (!is_array($decoded)) {
+            throw new \LogicException('Serialising an entity did not produce a JSON object.');
+        }
+
+        return $decoded;
     }
 
     public function test_a_hand_written_result_with_a_raw_payload_does_the_same(): void

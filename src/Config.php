@@ -109,7 +109,7 @@ final class Config
      * http_build_query() emits. Encoding as RFC 3986 rather than the default RFC 1738 only
      * changes how a space is written; parse_str() accepts both.
      *
-     * @param  array<string, scalar|array<mixed>|null>  $query
+     * @param  array<array-key, scalar|array<mixed>|null>  $query
      */
     public static function buildQuery(array $query): string
     {
