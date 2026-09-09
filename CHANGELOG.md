@@ -1,6 +1,14 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* README states which XenForo versions answer which endpoints - 154 of the 162 on 2.3,
+  144 on 2.2, 124 on 2.1 - measured on a real forum of each
+* The `write` exercise no longer stops at `threads/{id}/mark-read` on a forum older
+  than 2.2
+
 1.1.0 (2026-09-09)
 ------------------
 

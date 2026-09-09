@@ -128,10 +128,18 @@ something should say so.
   `ApiResponse::has()` is how to tell; `value()` with a default cannot.
 - **A missing route and a missing record are different 404s.** `requested_page_not_found`
   is a record (or, on some controllers, one the acting user may not see);
-  `endpoint_not_found` is a path or action the forum does not have - in 2.2 and 2.3 alike.
-  `apiFind()` returns null for the first and raises `EndpointNotFoundException` for the
-  second, because an add-on endpoint on a forum without the add-on is configuration, not
-  absence. Measured live on 2.3.12.
+  `endpoint_not_found` is a path or action the forum does not have - in 2.1, 2.2 and 2.3
+  alike. `apiFind()` returns null for the first and raises `EndpointNotFoundException` for
+  the second, because an add-on endpoint on a forum without the add-on is configuration,
+  not absence. Measured live on 2.1.15, 2.2.19 and 2.3.12.
+- **The pinned specification runs ahead of every release.** Eight of its 162 endpoints -
+  featured content, the feature/unfeature actions and conversation labels - are not in
+  2.3.12; 2.2.19 also lacks OAuth2, search, oEmbed and the retina thumbnail; 2.1.15 also
+  lacks alerts, stats, search forums, find-by-email, the session and login-token auth
+  actions, marking read, and thread move/change-type/vote and post vote/mark-solution.
+  154, 144 and 124 of the 162 respectively, derived from each version's API routes and
+  controllers, and every one of the missing ones answers `endpoint_not_found`. The README
+  carries the table; the harness has run green against all three.
 - **Read the error code, not the status.** XenForo answers 400 for most caller mistakes -
   a missing input, a validation failure, a page past the end.
 - **`GET threads/` is the recently-active list, not the thread list.** Unfiltered and

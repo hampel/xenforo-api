@@ -60,7 +60,7 @@ $info->hasScope('user:write');
 
 ## What is wrapped
 
-**All 162 endpoints in XenForo's specification**, through these accessors:
+**All 162 endpoints in XenForo's specification**, through these accessors — and see [which XenForo versions](#which-xenforo-versions) for what each release actually answers:
 
 | | |
 |---|---|
@@ -80,6 +80,24 @@ $info->hasScope('user:write');
 Coverage is checked in both directions by `SpecConformanceTest`: every path an endpoint
 class calls exists in the specification, and every endpoint the specification describes is
 called by one. A future spec bringing new endpoints fails that second check by name.
+
+### Which XenForo versions
+
+The specification is XenForo's current one, and it runs ahead of every release. What a
+forum actually answers depends on its version; an endpoint it does not have raises
+`EndpointNotFoundException`, and that is the whole of what happens. Measured on a real forum
+of each version — the count from its API routes and controllers, the client end to end
+through every harness exercise, writes, uploads and the Content-Type rule included:
+
+| XenForo | answers | what it does not have |
+|---|---|---|
+| 2.3.12 | 154 of 162 | `featured()`, `feature()`/`unfeature()` on threads, media and resources, `conversations()->setLabels()` |
+| 2.2.19 | 144 of 162 | the above, and `oauth2()`, `search()`, `oembed()`, `attachments()->retinaThumbnailUrl()` |
+| 2.1.15 | 124 of 162 | the above, and `alerts()`, `stats()`, `searchForums()`, `users()->findByEmail()`, `auth()->fromSession()` and `loginToken()`, `markRead()` on forums, threads and conversations, `threads()->move()`, `changeType()` and `vote()`, `posts()->vote()` and `markSolution()` |
+
+Media Gallery and Resource Manager have the same API on all three, apart from the
+feature/unfeature pair. `$xf->index()->get()->version()` is the way to find out which line
+you are talking to before relying on any of this.
 
 What no client can cover is what an add-on adds — see
 [Extending it](#extending-it-for-add-on-endpoints).
@@ -527,6 +545,7 @@ what you expect rather than what XenForo sends.
 `harness/` holds [`hampel/rig`](https://github.com/hampel/rig) exercises — real calls to a
 real forum, which is the only thing that can tell you whether an assumption about somebody
 else's API is still true. `vendor/bin/rig` lists them. Copy `.env.example` to `.env` first.
+Every exercise has run green against XenForo 2.1.15, 2.2.19 and 2.3.12.
 
 ## License
 
