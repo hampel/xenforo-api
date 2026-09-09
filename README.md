@@ -1,5 +1,13 @@
 # hampel/xenforo-api
 
+[![Tests](https://github.com/hampel/xenforo-api/actions/workflows/tests.yml/badge.svg)](https://github.com/hampel/xenforo-api/actions/workflows/tests.yml)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/hampel/xenforo-api.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api)
+[![Total Downloads](https://img.shields.io/packagist/dt/hampel/xenforo-api.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api)
+[![Open Issues](https://img.shields.io/github/issues-raw/hampel/xenforo-api.svg?style=flat-square)](https://github.com/hampel/xenforo-api/issues)
+[![License](https://img.shields.io/packagist/l/hampel/xenforo-api.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api)
+
+By [Simon Hampel](mailto:simon@hampelgroup.com)
+
 A PHP client for the [XenForo REST API](https://docs.xenforo.com/api) — core endpoints,
 add-on extensions and OAuth2 — over any PSR-18 HTTP client.
 
