@@ -35,6 +35,7 @@
  * @var Hampel\Rig\Io $io
  */
 
+use Hampel\XenForo\Api\Exception\EndpointNotFoundException;
 use Hampel\XenForo\Api\Exception\ExceptionInterface;
 
 require __DIR__ . '/lib/agent.php';
@@ -190,7 +191,13 @@ try {
     $retitled = $xf->threads()->update($thread->thread_id, ['title' => sprintf('%s harness thread %s (retitled)', $tag, $stamp)]);
     $io->line(str_ends_with((string) $retitled->title, '(retitled)') ? '     ✓ thread retitled' : '     ✗ retitle did not stick');
 
-    $io->line($xf->threads()->markRead($thread->thread_id) ? '     ✓ mark-read answered success' : '     ✗ mark-read answered success false');
+    // threads/{id}/mark-read arrived in 2.2. On 2.1 it is a missing route, which is a
+    // finding about the forum's version and not about the client, so say so and go on.
+    try {
+        $io->line($xf->threads()->markRead($thread->thread_id) ? '     ✓ mark-read answered success' : '     ✗ mark-read answered success false');
+    } catch (EndpointNotFoundException) {
+        $io->line('     - mark-read is not an endpoint on this forum (added in XenForo 2.2)');
+    }
     $io->line();
 
     // ---- 4. read it all back by id ---------------------------------------------------
