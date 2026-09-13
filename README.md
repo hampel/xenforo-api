@@ -1,4 +1,4 @@
-# hampel/xenforo-api
+# XenForo API client for PHP
 
 [![Tests](https://github.com/hampel/xenforo-api/actions/workflows/tests.yml/badge.svg)](https://github.com/hampel/xenforo-api/actions/workflows/tests.yml)
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/hampel/xenforo-api.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api)
@@ -28,11 +28,9 @@ composer require guzzlehttp/guzzle    # or any PSR-18 implementation
 
 ```php
 use GuzzleHttp\Client as Guzzle;
-use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Client;
-use Hampel\XenForo\Api\Config;
 
-$xf = new Client(new Config('https://forum.example.com'), new ApiKey($key), new Guzzle());
+$xf = Client::withKey('https://forum.example.com', $key, new Guzzle());
 
 $thread = $xf->threads()->get(1234);
 
@@ -42,6 +40,17 @@ echo $thread->title;
 The third argument is any PSR-18 client. The package also needs a PSR-17 factory to build
 requests with, and finds one itself — Guzzle's, Nyholm's or Diactoros', whichever is
 installed — unless you pass your own as the fourth and fifth arguments.
+
+`withKey()` is the short form for an API key. The long form takes a `Config` and any of the
+credentials below, which is where a super-user key, an OAuth2 token or a pinned API version
+come in:
+
+```php
+use Hampel\XenForo\Api\Authentication\SuperUserKey;
+use Hampel\XenForo\Api\Config;
+
+$xf = new Client(new Config('https://forum.example.com'), new SuperUserKey($key, actingAs: 42), new Guzzle());
+```
 
 `Config` takes the board URL or the API URL — either works, and the `/api` suffix is added
 if it is missing. Create the key in the forum's admin panel under **Setup → API keys**.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api;
 
+use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Authentication\Authentication;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
 use Hampel\XenForo\Api\Endpoint\Alerts;
@@ -110,6 +111,35 @@ final class Client
             $requestFactory,
             $streamFactory,
             $this->logger
+        );
+    }
+
+    /**
+     * The short form: a forum, an API key, and a transport.
+     *
+     * Everything the long constructor takes is still available on it; this exists because
+     * naming a Config and an ApiKey to accept both defaults is ceremony, and ceremony in an
+     * example is what gets copied. Named after the credential, as elsewhere: a SuperUserKey,
+     * a BearerToken or ClientCredentials takes more than a string, so those keep the long
+     * form, and withCredential() gets from this client to one of them.
+     *
+     * @param  string  $baseUri  the board URL or the API URL, as Config takes it
+     */
+    public static function withKey(
+        string $baseUri,
+        #[\SensitiveParameter] string $key,
+        ClientInterface $client,
+        ?RequestFactoryInterface $requestFactory = null,
+        ?StreamFactoryInterface $streamFactory = null,
+        ?LoggerInterface $logger = null,
+    ): self {
+        return new self(
+            new Config($baseUri),
+            new ApiKey($key),
+            $client,
+            $requestFactory,
+            $streamFactory,
+            $logger ?? new NullLogger()
         );
     }
 

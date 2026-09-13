@@ -35,6 +35,7 @@ use Hampel\XenForo\Api\Endpoint\SearchForums;
 use Hampel\XenForo\Api\Endpoint\Stats;
 use Hampel\XenForo\Api\Endpoint\Threads;
 use Hampel\XenForo\Api\Endpoint\Users;
+use Hampel\XenForo\Api\Client;
 use Hampel\XenForo\Api\Exception\InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -141,5 +142,20 @@ final class ClientTest extends TestCase
 
         $this->assertSame('forum.example.com', $xf->config()->host());
         $this->assertSame('API key', $xf->authentication()->describe());
+    }
+
+    public function test_the_short_form_is_a_forum_a_key_and_a_transport(): void
+    {
+        $xf = Client::withKey('https://forum.example.com', 'secret', $this->client);
+
+        $this->assertSame('forum.example.com', $xf->config()->host());
+        $this->assertInstanceOf(ApiKey::class, $xf->authentication());
+        $this->assertNull($xf->config()->version);
+
+        $this->client->pushJson(200, ['me' => ['user_id' => 1]]);
+        $xf->me()->get();
+
+        $this->assertSame('secret', $this->client->lastRequest()->getHeaderLine('XF-Api-Key'));
+        $this->assertSame('https://forum.example.com/api/me/', $this->sentUri());
     }
 }
