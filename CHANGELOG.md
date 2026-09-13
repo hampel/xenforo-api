@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+1.2.0 (2026-09-13)
+------------------
 
 * `Client::withKey($baseUri, $key, $client)` - the short form for an API key, so the
   ordinary case no longer names a `Config` and an `ApiKey` to accept both defaults
