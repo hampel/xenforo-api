@@ -7,6 +7,7 @@ namespace Hampel\XenForo\Api;
 use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Authentication\Authentication;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce;
 use Hampel\XenForo\Api\Endpoint\Alerts;
 use Hampel\XenForo\Api\Endpoint\Attachments;
 use Hampel\XenForo\Api\Endpoint\Auth;
@@ -83,6 +84,8 @@ final class Client
 
     /** @var array<class-string<Endpoint>, Endpoint> */
     private array $endpoints = [];
+
+    private ?eCommerce $ecommerce = null;
 
     /**
      * @param  RequestFactoryInterface|null  $requestFactory  PSR-17. Leave both null and the
@@ -403,6 +406,22 @@ final class Client
     public function resourceVersions(): ResourceVersions
     {
         return $this->endpoint(ResourceVersions::class);
+    }
+
+    /**
+     * DragonByte eCommerce, if the forum has it - products, licenses, downloads.
+     *
+     * A third-party add-on rather than one XenForo bundles, so its classes live apart from
+     * the rest, under Endpoint\DBTech\eCommerce, and they are reached through one accessor here
+     * rather than five. They are ordinary Endpoint subclasses: this is the extension
+     * mechanism described on endpoint(), with a name in front of it.
+     *
+     * eCommerce refuses any request that does not identify its board and platform, so the
+     * usual call is `$xf->ecommerce()->identifiedAs($identity)` - see Identity.
+     */
+    public function ecommerce(): eCommerce
+    {
+        return $this->ecommerce ??= new eCommerce($this);
     }
 
     /**

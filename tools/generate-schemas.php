@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Generate src/Generated/Schema/*.php from resources/openapi.json.
+ * Generate the entity classes from the specifications in resources/.
  *
  *     composer generate
  *
@@ -22,6 +22,12 @@ declare(strict_types=1);
  * resources/ is pinned deliberately: regenerating means updating that file first, and
  * recording which commit it came from in the changelog.
  *
+ * resources/dbtech-ecommerce.openapi.json is the other kind: DragonByte eCommerce ships no
+ * specification, so that one is transcribed by hand from the add-on's own @api annotations
+ * and pinned to the add-on version in its `info`. It describes eCommerce's entities only and
+ * refers to core ones - User, Attachment - as `openapi.json#/components/schemas/...`, which
+ * resolve to the core namespace below.
+ *
  * WHAT THE GENERATED CLASSES DELIBERATELY DO NOT DO
  *
  * They do not validate. Every field is nullable and every absent field reads as null,
@@ -32,43 +38,70 @@ declare(strict_types=1);
  */
 
 $root = dirname(__DIR__);
-$specFile = $root . '/resources/openapi.json';
-$targetDir = $root . '/src/Generated/Schema';
 
-$spec = json_decode((string) file_get_contents($specFile), true, 512, JSON_THROW_ON_ERROR);
+/**
+ * Each specification, where its classes go, their namespace and what their header calls the
+ * source - keyed by the spec's file name, which is how a `$ref` in one names another.
+ *
+ * @var array<string, array{string, string, string}> $runs
+ */
+$runs = [
+    'openapi.json' => [
+        'src/Generated/Schema',
+        'Hampel\\XenForo\\Api\\Generated\\Schema',
+        'the XenForo OpenAPI specification',
+    ],
+    'dbtech-ecommerce.openapi.json' => [
+        'src/Generated/Schema/DBTech/eCommerce',
+        'Hampel\\XenForo\\Api\\Generated\\Schema\\DBTech\\eCommerce',
+        'the DragonByte eCommerce API specification',
+    ],
+];
 
-$components = is_array($spec) ? ($spec['components'] ?? null) : null;
-$schemas = is_array($components) ? ($components['schemas'] ?? null) : null;
+$namespaces = array_map(static fn (array $run): string => $run[1], $runs);
 
-if (!is_array($spec) || !is_array($schemas)) {
-    fwrite(STDERR, "No components.schemas in {$specFile}\n");
-    exit(1);
+foreach ($runs as $file => [$target, $namespace, $source]) {
+    $specFile = $root . '/resources/' . $file;
+    $targetDir = $root . '/' . $target;
+
+    $spec = json_decode((string) file_get_contents($specFile), true, 512, JSON_THROW_ON_ERROR);
+
+    $components = is_array($spec) ? ($spec['components'] ?? null) : null;
+    $schemas = is_array($components) ? ($components['schemas'] ?? null) : null;
+
+    if (!is_array($spec) || !is_array($schemas)) {
+        fwrite(STDERR, "No components.schemas in {$specFile}\n");
+        exit(1);
+    }
+
+    /** @var array<string, array<mixed>> $schemas */
+
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0o755, true)) {
+        fwrite(STDERR, "Could not create {$targetDir}\n");
+        exit(1);
+    }
+
+    // Anything left over from a previous run for a schema the spec no longer has. Removing it
+    // matters more than it looks: a stale entity keeps compiling and keeps passing tests.
+    foreach (glob($targetDir . '/*.php') ?: [] as $existing) {
+        unlink($existing);
+    }
+
+    $info = $spec['info'] ?? null;
+    $version = is_array($info) && is_string($info['version'] ?? null) ? $info['version'] : '?';
+    $count = 0;
+
+    foreach ($schemas as $name => $schema) {
+        $class = className($name);
+        file_put_contents(
+            $targetDir . '/' . $class . '.php',
+            renderClass($class, $name, $schema, $namespace, $source, $version, $namespaces)
+        );
+        $count++;
+    }
+
+    echo "Generated {$count} entities in {$target} from {$file} (version {$version}).\n";
 }
-
-/** @var array<string, array<mixed>> $schemas */
-
-if (!is_dir($targetDir) && !mkdir($targetDir, 0o755, true)) {
-    fwrite(STDERR, "Could not create {$targetDir}\n");
-    exit(1);
-}
-
-// Anything left over from a previous run for a schema the spec no longer has. Removing it
-// matters more than it looks: a stale entity keeps compiling and keeps passing tests.
-foreach (glob($targetDir . '/*.php') ?: [] as $existing) {
-    unlink($existing);
-}
-
-$info = $spec['info'] ?? null;
-$version = is_array($info) && is_string($info['version'] ?? null) ? $info['version'] : '?';
-$count = 0;
-
-foreach ($schemas as $name => $schema) {
-    $class = className($name);
-    file_put_contents($targetDir . '/' . $class . '.php', renderClass($class, $name, $schema, $version));
-    $count++;
-}
-
-echo "Generated {$count} entities in src/Generated/Schema from OpenAPI {$version}.\n";
 
 /**
  * XFMG_MediaItem and XFRM_ResourceItem are the add-on entities. Their spec names are
@@ -82,9 +115,17 @@ function className(string $name): string
 
 /**
  * @param  array<mixed>  $schema
+ * @param  array<string, string>  $namespaces  every run's namespace, by spec file name
  */
-function renderClass(string $class, string $specName, array $schema, string $version): string
-{
+function renderClass(
+    string $class,
+    string $specName,
+    array $schema,
+    string $namespace,
+    string $source,
+    string $version,
+    array $namespaces,
+): string {
     $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
 
     $declarations = [];
@@ -95,7 +136,7 @@ function renderClass(string $class, string $specName, array $schema, string $ver
             continue;
         }
 
-        [$type, $docType, $expression, $default] = resolve($definition, $field);
+        [$type, $docType, $expression, $default] = resolve($definition, $field, $namespaces);
 
         $description = is_string($definition['description'] ?? null) ? trim($definition['description']) : '';
 
@@ -142,14 +183,14 @@ function renderClass(string $class, string $specName, array $schema, string $ver
 
         declare(strict_types=1);
 
-        namespace Hampel\\XenForo\\Api\\Generated\\Schema;
+        namespace {$namespace};
 
         use Hampel\\XenForo\\Api\\Support\\Cast;
 
         /**
          * {$summary}
          *
-         * Generated from the XenForo OpenAPI specification (version {$version}) by
+         * Generated from {$source} (version {$version}) by
          * tools/generate-schemas.php. Do not edit by hand - run `composer generate`.
          *
          * Every field is nullable because a XenForo API result is not a fixed record: it
@@ -205,16 +246,28 @@ function renderClass(string $class, string $specName, array $schema, string $ver
 
 /**
  * @param  array<mixed>  $definition
+ * @param  array<string, string>  $namespaces  every run's namespace, by spec file name
  * @return array{string, string|null, string, string}  php type, docblock type, the
  *                                                     expression that builds it, default
  */
-function resolve(array $definition, string $field): array
+function resolve(array $definition, string $field, array $namespaces): array
 {
     $access = "\$data['{$field}'] ?? null";
 
     $ref = $definition['$ref'] ?? null;
     if (is_string($ref)) {
         $class = className(basename($ref));
+
+        // `openapi.json#/components/schemas/User` is another spec's entity, so the class is
+        // named in full. A ref with no file part is this spec's own, in this namespace.
+        $file = strstr($ref, '#', true);
+        if ($file !== false && $file !== '') {
+            if (!isset($namespaces[$file])) {
+                throw new RuntimeException("{$field} refers to {$ref}, and {$file} is not a specification this generates.");
+            }
+
+            $class = '\\' . $namespaces[$file] . '\\' . $class;
+        }
 
         return [
             '?' . $class,
@@ -230,7 +283,7 @@ function resolve(array $definition, string $field): array
     if (is_array($union)) {
         foreach ($union as $member) {
             if (is_array($member) && ($member['type'] ?? null) !== 'null') {
-                return resolve($member, $field);
+                return resolve($member, $field, $namespaces);
             }
         }
     }

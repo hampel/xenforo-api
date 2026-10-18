@@ -6,6 +6,12 @@ namespace Hampel\XenForo\Api\Tests;
 
 use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce\Categories as eCommerceCategories;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce\Downloads as eCommerceDownloads;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce\Licenses as eCommerceLicenses;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce\Products as eCommerceProducts;
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce\Reviews as eCommerceReviews;
 use Hampel\XenForo\Api\Endpoint\Alerts;
 use Hampel\XenForo\Api\Endpoint\Attachments;
 use Hampel\XenForo\Api\Endpoint\Auth;
@@ -129,6 +135,41 @@ final class ClientTest extends TestCase
             'resourceReviews' => ResourceReviews::class,
             'resourceUpdates' => ResourceUpdates::class,
             'resourceVersions' => ResourceVersions::class,
+        ];
+
+        foreach ($accessors as $accessor => $class) {
+            yield $accessor => [$accessor, $class];
+        }
+    }
+
+    /**
+     * eCommerce's five groups sit behind one accessor rather than five, and each is still
+     * the instance endpoint() hands out for its class.
+     *
+     * @param  class-string<\Hampel\XenForo\Api\Endpoint\Endpoint>  $class
+     */
+    #[DataProvider('ecommerceAccessors')]
+    public function test_an_ecommerce_accessor_is_endpoint_with_the_class(string $accessor, string $class): void
+    {
+        $xf = $this->xenforo();
+
+        $this->assertInstanceOf(eCommerce::class, $xf->ecommerce());
+        $this->assertSame($xf->ecommerce(), $xf->ecommerce());
+        $this->assertInstanceOf($class, $xf->ecommerce()->{$accessor}());
+        $this->assertSame($xf->endpoint($class), $xf->ecommerce()->{$accessor}());
+    }
+
+    /**
+     * @return iterable<string, array{string, class-string<\Hampel\XenForo\Api\Endpoint\Endpoint>}>
+     */
+    public static function ecommerceAccessors(): iterable
+    {
+        $accessors = [
+            'products' => eCommerceProducts::class,
+            'categories' => eCommerceCategories::class,
+            'downloads' => eCommerceDownloads::class,
+            'licenses' => eCommerceLicenses::class,
+            'reviews' => eCommerceReviews::class,
         ];
 
         foreach ($accessors as $accessor => $class) {

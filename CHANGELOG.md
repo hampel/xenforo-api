@@ -1,6 +1,23 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* DragonByte eCommerce: `$xf->ecommerce()` reaches its products, categories, downloads,
+  licenses and reviews - all 28 of its endpoints. A third-party add-on, so its classes live
+  under `Endpoint\DBTech\eCommerce` and `Generated\Schema\DBTech\eCommerce` rather than beside
+  XFMG and XFRM
+* Its entities are generated from `resources/dbtech-ecommerce.openapi.json`, transcribed by
+  hand from eCommerce 5.4.2's own API annotations, and `SpecConformanceTest` holds the
+  eCommerce endpoints to it in both directions
+* eCommerce refuses any request that does not identify the board and platform it is for, so
+  `Identity` carries the four `X-DragonByte-*` headers and `identifiedAs()` - on
+  `$xf->ecommerce()` or any one endpoint - sends them on every request
+* `composer generate` builds from more than one specification, and an entity in one may refer
+  to an entity in another
+* The `dbtech-ecommerce` harness exercise, read-only
+
 1.2.2 (2026-10-08)
 ------------------
 

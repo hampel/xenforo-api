@@ -85,6 +85,7 @@ $info->hasScope('user:write');
 | `oauth2()` | the token endpoints: exchange, refresh, introspect, revoke |
 | `media()` `mediaAlbums()` `mediaCategories()` `mediaComments()` | XenForo Media Gallery |
 | `resources()` `resourceCategories()` `resourceReviews()` `resourceUpdates()` `resourceVersions()` | XenForo Resource Manager |
+| `ecommerce()` | DragonByte eCommerce, a third-party add-on — [see below](#dragonbyte-ecommerce) |
 
 Coverage is checked in both directions by `SpecConformanceTest`: every path an endpoint
 class calls exists in the specification, and every endpoint the specification describes is
@@ -339,6 +340,85 @@ independently. And a resource version whose `download_url` is set is hosted some
 entirely — XFRM answers with a redirect rather than bytes, so check that field before
 calling `download()`.
 
+## DragonByte eCommerce
+
+**DragonByte eCommerce is a third-party add-on**, not one XenForo bundles. It is wrapped
+here as the worked example of the mechanism in [Add-on endpoints](#add-on-endpoints), so
+its classes live apart, under `Endpoint\DBTech\eCommerce` and `Generated\Schema\DBTech\eCommerce`,
+behind one accessor:
+
+| accessor | what it covers |
+|---|---|
+| `ecommerce()->products()` | products, their downloads, latest version and reviews, and purchased products |
+| `ecommerce()->categories()` | the category tree, and a category's products |
+| `ecommerce()->downloads()` | releases, and downloading one version's file |
+| `ecommerce()->licenses()` | the acting user's licenses, and a license by its key |
+| `ecommerce()->reviews()` | reviews, and the owner's reply to one |
+
+```php
+$ecommerce = $xf->ecommerce()->identifiedAs($identity);   // see "Identifying the request" below
+
+$latest = $ecommerce->products()->latestVersion($productId, type: 'full');
+
+foreach ($ecommerce->licenses()->list() as $license) {
+    echo $license->license_key, ' ', $license->Product?->title, "\n";
+}
+
+$ecommerce->downloads()->download($downloadId, '2.3', 'full')->saveTo('/tmp/release.zip');
+```
+
+`$xf->endpoint(Products::class)` reaches the same instance, as with any `Endpoint`.
+
+Its entities are generated, like core's, from `resources/dbtech-ecommerce.openapi.json`.
+eCommerce publishes no specification, so that one is transcribed by hand from the add-on's own
+`@api` annotations and pinned to **eCommerce 5.4.2**, whose API this package was written
+against. `SpecConformanceTest` holds the eCommerce endpoint classes to it in both directions,
+as it does core's.
+
+**Use 5.4.2 or later.** That release changed several answers this package relies on. On an
+earlier version, these are what change:
+
+| on 5.4.1 and earlier | from 5.4.2 |
+|---|---|
+| `licenses()->list()` and `products()->purchased()` with nothing to show answer HTTP 402 `you_have_not_purchased_any_licenses_yet` | an empty list |
+| a refused download is a 402, so a `ClientException` | a 403, so a `NotPermittedException`; the error code is unchanged |
+| `products()->downloads()` with no matching version is a 404 `no_downloadable_version_found` | an empty page |
+| `products()->latestVersion()` on a product with no downloads at all is a 500 | `null` |
+| `categories()->products()` answers the whole category on every page, so `eachProduct()` yields it once per page | paginated |
+| with its API switched off, every endpoint answers like a missing record, so `find()` returns `null` | `endpoint_not_found`, so `EndpointNotFoundException` |
+
+**Identifying the request.** eCommerce logs every API request before answering it, and the
+log requires four headers: `X-DragonByte-BoardUrl`, `-HttpHost`, `-Software` and
+`-SoftwareVersion`. They name the customer's board and the platform the licensed product runs
+on, such as `XenForo` and `2.3.12`. A request without them is refused on every endpoint with a 400
+`please_enter_value_for_required_field_x`, naming `board_url`, `http_host`, `software` and
+`software_version`. That is by design, because the API exists for licensed software to check
+in. So build an `Identity` and attach it once:
+
+```php
+use Hampel\XenForo\Api\Endpoint\DBTech\eCommerce\Identity;
+
+$identity = Identity::forBoard('https://customer.example.org', 'XenForo', '2.3.12');   // host from the URL
+$ecommerce = $xf->ecommerce()->identifiedAs($identity);
+
+$licenses = $ecommerce->licenses()->list();
+```
+
+`identifiedAs()` returns a copy, on the facade and on any single endpoint alike, so the
+instances `Client::endpoint()` shares stay unidentified. An `Identity` with an empty value is
+refused before anything is sent. The board URL does a second job: a board that hands out only
+the licenses whose license field matches the board they are used on filters by it. So it
+decides which licenses, purchased products and downloads the user appears to have.
+
+**Scopes.** Each group has its own `dbtech_ecommerce_*` scopes: `product`, `category`,
+`download`, `license` and `rating`, the last of which covers reviews. The lists that hang
+off a product need two: its downloads need `download:read` as well, its reviews
+`rating:read`, and purchased products `license:read`. A soft delete is a `:write` and a hard
+delete also needs `:delete_hard`. Categories are the exception: they have no soft delete, so
+deleting one needs `category:delete`, and writing a category also needs the
+`dbtechEcomCategory` admin permission. Licenses are read-only and belong to the acting user,
+so they need a registered user — with a super-user key, `actingAs()`.
+
 ## Errors
 
 ```php
@@ -392,7 +472,8 @@ For a one-off, call it directly:
 $xf->connection()->get('users/find-criteria', ['email' => $email])->data;
 ```
 
-For anything used more than once, write an `Endpoint`. This one answers with a `user`
+For anything used more than once, write an `Endpoint` — `src/Endpoint/DBTech/eCommerce` is a
+whole add-on's worth of them, with its own base class and generated entities. This one answers with a `user`
 *and* a `urls` block beside it, which is the usual shape of an add-on endpoint — so it maps
 the whole response rather than one key of it:
 
@@ -566,7 +647,9 @@ what you expect rather than what XenForo sends.
 `harness/` holds [`hampel/rig`](https://github.com/hampel/rig) exercises — real calls to a
 real forum, which is the only thing that can tell you whether an assumption about somebody
 else's API is still true. `vendor/bin/rig` lists them. Copy `.env.example` to `.env` first.
-Every exercise has run green against XenForo 2.1.15, 2.2.19 and 2.3.12.
+Every exercise but `dbtech-ecommerce` has run green against XenForo 2.1.15, 2.2.19 and
+2.3.12; `dbtech-ecommerce` reads DragonByte eCommerce, which needs 2.3, and the add-on,
+read-only.
 
 ## License
 

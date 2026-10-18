@@ -11,7 +11,7 @@ composer check          # lint, analyse, test - what CI runs
 composer test           # phpunit
 composer analyse        # phpstan, level 9, PHP 8.3-8.5 in one pass
 composer format         # pint
-composer generate       # regenerate src/Generated/Schema from resources/openapi.json
+composer generate       # regenerate the entity classes from both specifications in resources/
 ```
 
 ## Layout
@@ -24,11 +24,13 @@ composer generate       # regenerate src/Generated/Schema from resources/openapi
 | `src/Endpoint/` | hand-written endpoint groups, and the `Endpoint` base class - every endpoint in the pinned specification |
 | `src/Endpoint/Media*`, `Resource*` | XFMG and XFRM - add-ons, wrapped for convenience |
 | `src/Generated/Schema/` | entity classes, generated - do not edit |
+| `src/Endpoint/DBTech/eCommerce/`, `src/Generated/Schema/DBTech/eCommerce/` | DragonByte eCommerce, third-party - its endpoints and generated entities, and the `eCommerce` facade beside them in `src/Endpoint/DBTech/` |
 | `src/Result/` | what an endpoint answers with, where that is not an entity |
 | `src/Exception/` | the hierarchy, from `XenForoException` down |
 | `src/Upload.php`, `src/Multipart.php` | files going out, and the `multipart/form-data` body that carries them |
 | `src/Support/` | coercion, the field naming shared by both body encodings, and PSR-17 discovery |
 | `resources/openapi.json` | XenForo's own specification, pinned |
+| `resources/dbtech-ecommerce.openapi.json` | DragonByte eCommerce's, transcribed by hand, pinned to 5.4.2 |
 | `tools/generate-schemas.php` | the generator |
 | `harness/` | rig exercises - real calls to a real forum |
 
@@ -45,6 +47,14 @@ opposite - what makes the client pleasant is deciding that a thread's posts are
 artefact of the product, so the copy here is pinned deliberately: regenerating means
 updating that file first and recording in the changelog which commit it came from.
 
+`resources/dbtech-ecommerce.openapi.json` has no upstream at all. eCommerce ships no
+specification and XenForo's `xf-dev:generate-api-docs` has no OpenAPI renderer, so it was
+transcribed from the add-on's `@api-*` docblocks, each entity's `setupApiResultData()` and
+the controllers' `filter()` calls. It refers to core entities as
+`openapi.json#/components/schemas/User`, which the generator resolves into the core
+namespace. Moving it to a newer eCommerce means re-reading those three places, not
+downloading a file.
+
 ## XFMG and XFRM
 
 The Media Gallery and Resource Manager resources are wrapped, and they are add-ons rather
@@ -58,6 +68,36 @@ Two shapes there exist nowhere else in the API, and both are noted where they li
 `comment_pagination`, which is why `Page::fromResponse()` takes a pagination key), and a
 resource version with a `download_url` is hosted off-site and answers a download with a
 redirect.
+
+## DragonByte eCommerce
+
+A third-party add-on, which is why it sits in its own namespace behind one accessor,
+`$xf->ecommerce()`, rather than beside XFMG and XFRM. It is the worked example of the
+extension mechanism below, at the scale of a whole add-on.
+
+- **Pinned to 5.4.2, and 5.4.2 changed the API.** Lists with nothing to show became empty
+  rather than a 402 (licenses, purchased products) or a 404 (a product's downloads); download
+  refusals became 403 rather than 402; `latest-version` on a product with no downloads became
+  a 404 rather than a 500; `categories/{id}/products` started honouring the page; an API
+  switched off in options answers `endpoint_not_found` rather than a plain 404. The README has
+  the table. Those changes were made in the add-on at the same time as this client.
+- **Every request must identify itself, deliberately.** `AbstractLoggableEndpoint` logs each
+  request before dispatch, and `Entity/ApiRequestLog` marks `board_url`, `http_host`, `software`
+  and `software_version` required. So a request without the four `X-DragonByte-*` headers is a
+  400 `please_enter_value_for_required_field_x` on every endpoint. The catalogue this was built
+  from said missing headers were logged as `""`, and the first live run proved otherwise.
+  `Identity` carries them, and `identifiedAs()`, on the facade or on an endpoint, attaches it
+  as a copy, because `Client::endpoint()` memoises one shared instance. "Software" is the
+  licensed platform (`XenForo`, `2.3.12`), not this package. The board URL also decides which
+  licenses exist on a board that matches licenses to boards (`dbtechEcommerceApiLicenseFilterField`).
+- **Scopes come in pairs on product sub-resources.** `{id}/downloads` and `{id}/latest-version`
+  also need `download:read`, `{id}/reviews` `rating:read`, and `purchased` `license:read`.
+  DELETE is `:write`, plus `:delete_hard` for a hard delete, except categories, which have no
+  soft delete and use `category:delete`.
+- **`latestVersion` is the API's one camelCase key**, and reviews are `ProductRating` /
+  `dbtech_ecommerce_rating:*` - eCommerce's internal name for them.
+- **The license route takes the key as a string**, so `Licenses` URL-encodes it into a local
+  variable first; `SpecConformanceTest` reads only `$var` concatenation.
 
 ## Extending it
 
@@ -168,7 +208,8 @@ something should say so.
 
 ## The harness
 
-`vendor/bin/rig` lists the exercises. `index`, `read` and `pagination` are read-only.
+`vendor/bin/rig` lists the exercises. `index`, `read`, `pagination` and `dbtech-ecommerce`
+are read-only.
 
 `encoding` sends six requests to a real forum: four login attempts that cannot succeed,
 and one attachment it uploads and then deletes through the header under test. Nothing
@@ -185,6 +226,11 @@ package builds and returns the same bytes through the download path.
 ```bash
 XENFORO_UPLOAD=1 vendor/bin/rig upload
 ```
+
+`dbtech-ecommerce` reads DragonByte eCommerce - categories, products, a product's downloads
+and latest version, the acting user's licenses - and is read-only. It identifies as the forum
+itself (its board URL, host, `XenForo` and its version) unless the `XENFORO_ECOMMERCE_BOARD_URL`,
+`_HTTP_HOST`, `_SOFTWARE` and `_SOFTWARE_VERSION` variables say otherwise, and prints what it sent.
 
 `write` creates content and leaves it - a thread, replies, a reaction, an edit, and with
 `XENFORO_WRITE_USER=1` a user who posts the replies, which is the live test of

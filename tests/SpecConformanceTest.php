@@ -25,28 +25,59 @@ use PHPUnit\Framework\TestCase as BaseTestCase;
  * `resources/openapi.json` is next updated, whatever XenForo has added shows up here as a
  * named failure rather than as nothing at all, which is the only moment anybody would
  * otherwise have noticed.
+ *
+ * Each specification is held to its own classes. DragonByte eCommerce's endpoints are checked
+ * against resources/dbtech-ecommerce.openapi.json, which is transcribed by hand rather than
+ * published - so here the test catches a path mistyped in either place, and the two failing
+ * together is the cue to go back to the add-on's source.
  */
 final class SpecConformanceTest extends BaseTestCase
 {
     /**
-     * @return iterable<string, array{string, string, string}>
+     * The endpoint classes each specification is held to: their directory, the base class
+     * there that is not itself an endpoint group, and how many calls the extractor must find.
+     */
+    private const SETS = [
+        'openapi.json' => ['src/Endpoint', 'Endpoint.php', 40],
+        'dbtech-ecommerce.openapi.json' => ['src/Endpoint/DBTech/eCommerce', 'eCommerceEndpoint.php', 20],
+    ];
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function specifications(): iterable
+    {
+        foreach (array_keys(self::SETS) as $spec) {
+            yield $spec => [$spec];
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string, string}>
      */
     public static function endpoints(): iterable
     {
-        foreach (self::extractCalls() as [$file, $method, $path]) {
-            yield sprintf('%s %s (%s)', $method, $path, $file) => [$method, $path, $file];
+        foreach (array_keys(self::SETS) as $spec) {
+            foreach (self::extractCalls($spec) as [$file, $method, $path]) {
+                yield sprintf('%s %s (%s)', $method, $path, $file) => [$spec, $method, $path, $file];
+            }
         }
     }
 
     #[DataProvider('endpoints')]
-    public function test_the_endpoint_exists_in_the_specification(string $method, string $path, string $file): void
-    {
-        $paths = self::paths();
+    public function test_the_endpoint_exists_in_the_specification(
+        string $spec,
+        string $method,
+        string $path,
+        string $file,
+    ): void {
+        $paths = self::paths($spec);
 
         $this->assertArrayHasKey($path, $paths, sprintf(
-            '%s calls %s, which is not a path in the XenForo API specification.',
+            '%s calls %s, which is not a path in %s.',
             $file,
-            $path
+            $path,
+            $spec
         ));
 
         $this->assertArrayHasKey(strtolower($method), $paths[$path], sprintf(
@@ -69,17 +100,18 @@ final class SpecConformanceTest extends BaseTestCase
      * the decision belongs here, in the diff, with the reason beside it - which is a better
      * record than a list nobody revisits.
      */
-    public function test_every_endpoint_in_the_specification_is_wrapped(): void
+    #[DataProvider('specifications')]
+    public function test_every_endpoint_in_the_specification_is_wrapped(string $spec): void
     {
         $wrapped = [];
 
-        foreach (self::extractCalls() as [, $method, $path]) {
+        foreach (self::extractCalls($spec) as [, $method, $path]) {
             $wrapped[$method . ' ' . $path] = true;
         }
 
         $missing = [];
 
-        $paths = self::paths();
+        $paths = self::paths($spec);
 
         foreach ($paths as $path => $operations) {
             foreach ($operations as $method => $operation) {
@@ -96,8 +128,9 @@ final class SpecConformanceTest extends BaseTestCase
         }
 
         $this->assertSame([], $missing, sprintf(
-            "The specification describes %d endpoint(s) no resource class calls:\n  %s\n"
+            "%s describes %d endpoint(s) no resource class calls:\n  %s\n"
                 . 'Wrap them, or record here why not.',
+            $spec,
             count($missing),
             implode("\n  ", $missing)
         ));
@@ -108,28 +141,34 @@ final class SpecConformanceTest extends BaseTestCase
      * finding calls, every test above would pass by finding nothing to check - which is the
      * failure mode a data-provider test has and a plain one does not.
      */
-    public function test_it_found_the_calls(): void
+    #[DataProvider('specifications')]
+    public function test_it_found_the_calls(string $spec): void
     {
-        $this->assertGreaterThan(40, count(self::extractCalls()));
+        $this->assertGreaterThan(self::SETS[$spec][2], count(self::extractCalls($spec)));
     }
 
     /**
      * @return array<mixed>
      */
-    private static function spec(): array
+    private static function spec(string $name): array
     {
-        static $spec = null;
+        static $specs = [];
 
-        if ($spec === null) {
-            $spec = json_decode(
-                (string) file_get_contents(dirname(__DIR__) . '/resources/openapi.json'),
+        if (!isset($specs[$name])) {
+            $specs[$name] = json_decode(
+                (string) file_get_contents(dirname(__DIR__) . '/resources/' . $name),
                 true,
                 512,
                 JSON_THROW_ON_ERROR
             );
         }
 
-        /** @var array<mixed> $spec */
+        $spec = $specs[$name];
+
+        if (!is_array($spec)) {
+            throw new \LogicException("{$name} is not a JSON object.");
+        }
+
         return $spec;
     }
 
@@ -138,9 +177,9 @@ final class SpecConformanceTest extends BaseTestCase
      *
      * @return array<string, array<mixed>>
      */
-    private static function paths(): array
+    private static function paths(string $spec): array
     {
-        $paths = self::spec()['paths'] ?? null;
+        $paths = self::spec($spec)['paths'] ?? null;
 
         if (!is_array($paths)) {
             throw new \LogicException('The specification has no paths block.');
@@ -158,15 +197,18 @@ final class SpecConformanceTest extends BaseTestCase
     }
 
     /**
-     * Every API call in src/Endpoint, as [file, method, path].
+     * Every API call in the endpoint classes a specification is held to, as
+     * [file, method, path].
      *
      * Read statically out of the source: a path built as `'users/' . $userId . '/'` becomes
      * `/users/{id}/`, which is the form the specification uses.
      *
      * @return list<array{string, string, string}>
      */
-    private static function extractCalls(): array
+    private static function extractCalls(string $spec): array
     {
+        [$directory, $base] = self::SETS[$spec];
+
         $methods = [
             'apiGet' => 'GET',
             'apiGetRaw' => 'GET',
@@ -191,10 +233,10 @@ final class SpecConformanceTest extends BaseTestCase
 
         $calls = [];
 
-        foreach (glob(dirname(__DIR__) . '/src/Endpoint/*.php') ?: [] as $file) {
+        foreach (glob(dirname(__DIR__) . '/' . $directory . '/*.php') ?: [] as $file) {
             $name = basename($file);
 
-            if ($name === 'Endpoint.php') {
+            if ($name === $base) {
                 continue; // the base class, whose paths are its callers'
             }
 
