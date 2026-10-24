@@ -58,19 +58,48 @@ final class Alerts extends Endpoint
     }
 
     /**
-     * Mark one alert. Read and viewed are separate states in XenForo: viewed means it has
-     * appeared in the alert popup, read means it has been acted on.
+     * Mark one alert read, or only viewed. Viewed means it has appeared in the alert
+     * popup; read means it has been acted on, and marking read marks it viewed too.
+     *
+     * XenForo acts on ONE flag per request and checks `viewed` before `read`, so a
+     * request carrying both true only marks the alert viewed - the call succeeds and the
+     * alert stays unread. Only the strongest flag asked for is sent: `read` when $read,
+     * otherwise `viewed`. With both false XenForo answers that input is required.
+     *
+     * Needs only the `alert:read` scope: XenForo exempts both mark endpoints from the
+     * `alert:write` a POST would otherwise require.
      */
     public function mark(int $alertId, bool $read = true, bool $viewed = true): bool
     {
-        return $this->apiPost('alerts/' . $alertId . '/mark', [
-            'read' => $read,
-            'viewed' => $viewed,
-        ])->isSuccess();
+        return $this->apiPost('alerts/' . $alertId . '/mark', self::markFlag($read, $viewed))->isSuccess();
     }
 
+    /**
+     * Mark one alert unread again - the third state the mark endpoint takes.
+     */
+    public function markUnread(int $alertId): bool
+    {
+        return $this->apiPost('alerts/' . $alertId . '/mark', ['unread' => true])->isSuccess();
+    }
+
+    /**
+     * Mark every alert read, or only viewed. The same one-flag rule as mark(), and the
+     * same `alert:read` scope; there is no unread form of this one.
+     */
     public function markAll(bool $read = true, bool $viewed = true): bool
     {
-        return $this->apiPost('alerts/mark-all', ['read' => $read, 'viewed' => $viewed])->isSuccess();
+        return $this->apiPost('alerts/mark-all', self::markFlag($read, $viewed))->isSuccess();
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private static function markFlag(bool $read, bool $viewed): array
+    {
+        return match (true) {
+            $read => ['read' => true],
+            $viewed => ['viewed' => true],
+            default => ['read' => false, 'viewed' => false],
+        };
     }
 }

@@ -1,6 +1,14 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* `Alerts::mark()` and `markAll()` mark alerts read with their defaults. XenForo acts on
+  one flag per request and checks `viewed` first, so sending both left alerts unread;
+  only the strongest flag asked for is sent now
+* `Alerts::markUnread()`
+
 1.2.2 (2026-10-08)
 ------------------
 

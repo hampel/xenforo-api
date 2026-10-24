@@ -28,15 +28,51 @@ final class AlertsTest extends TestCase
     }
 
     /**
-     * Read and viewed are separate states in XenForo, and both are sent explicitly rather
-     * than left to a default that differs between the two mark endpoints.
+     * XenForo acts on one flag and checks `viewed` first, so a request carrying both
+     * marks the alert viewed and leaves it unread. The default call must send `read`
+     * alone, which marks it viewed as well.
      */
-    public function test_marking_sends_both_states(): void
+    public function test_the_default_mark_sends_read_and_not_viewed(): void
     {
         $this->client->pushJson(200, ['success' => true]);
 
-        $this->xenforo()->alerts()->mark(5, read: true, viewed: false);
+        $this->xenforo()->alerts()->mark(5);
 
-        $this->assertSame(['read' => '1', 'viewed' => '0'], $this->sentBody());
+        $this->assertSame(['read' => '1'], $this->sentBody());
+        $this->assertStringEndsWith('/alerts/5/mark', $this->sentUri());
+    }
+
+    public function test_marking_only_viewed_sends_viewed(): void
+    {
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->xenforo()->alerts()->mark(5, read: false);
+
+        $this->assertSame(['viewed' => '1'], $this->sentBody());
+    }
+
+    public function test_an_alert_can_be_marked_unread(): void
+    {
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->xenforo()->alerts()->markUnread(5);
+
+        $this->assertSame(['unread' => '1'], $this->sentBody());
+    }
+
+    public function test_the_default_mark_all_sends_read_and_not_viewed(): void
+    {
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->xenforo()->alerts()->markAll();
+
+        $this->assertSame(['read' => '1'], $this->sentBody());
+        $this->assertStringEndsWith('/alerts/mark-all', $this->sentUri());
+
+        $this->client->pushJson(200, ['success' => true]);
+
+        $this->xenforo()->alerts()->markAll(read: false);
+
+        $this->assertSame(['viewed' => '1'], $this->sentBody());
     }
 }
